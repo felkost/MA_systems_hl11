@@ -34,6 +34,11 @@ OBS = "obs"
 # has no declared layer, which `test_every_module_has_a_declared_layer` treats
 # as a failure rather than as permission to import anything.
 LAYER_OF_MODULE: dict[str, str] = {
+    # Package markers (`__init__.py`) declare the same layer as the modules
+    # they contain -- an empty marker file still needs a home in the table,
+    # or a fresh `agents/__init__.py` silently escapes the import-walk.
+    "agents": DOMAIN,
+    "evals": OBS,
     "main": INTERFACE,
     "supervisor": APPLICATION,
     "orchestrator": APPLICATION,

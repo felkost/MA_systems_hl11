@@ -8,10 +8,11 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 0 of 10 (kickoff).** The repository skeleton, the rules and
-> the layering test exist. **No application code has been written yet** — that
-> is what kickoff is supposed to look like. Sections marked *(planned)* below
-> describe what is coming, not what runs today.
+> **Status: stage 1 of 10 (SDK reconnaissance) complete.** The DeepEval
+> integration wrapper (`evals/deepeval_model.py`) is built and verified live
+> against OpenRouter. **The agent system itself has not been written yet** —
+> that is stages 2 onward. Sections marked *(planned)* below describe what is
+> coming, not what runs today.
 
 ## Architecture
 
