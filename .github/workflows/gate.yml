@@ -1,7 +1,17 @@
 name: gate
 
 on:
+  # `push:` is scoped to `main` only. A feature-branch commit that fires
+  # both `push` and `pull_request` for the same SHA gets its context
+  # disambiguated by GitHub into "gate / offline gate (push)" and
+  # "... (pull_request)" -- neither of which matches the bare
+  # "gate / offline gate" that branch protection requires, so the check
+  # hangs as permanently pending. Scoping push to `main` means a branch
+  # commit fires only `pull_request` (one context, unsuffixed, matches),
+  # and a merge to `main` fires only `push` (same). Found live on the
+  # stage-1 PR, 2026-08-22.
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
