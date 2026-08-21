@@ -14,6 +14,12 @@ pytest>=8.0
 pytest-randomly>=3.15
 pytest-timeout>=2.3
 
+# Present transitively via deepeval (which needs it for its own async test
+# support), and pinned explicitly anyway -- this project's own async tests
+# (evals/deepeval_model.py) must not depend on somebody else's dependency
+# graph for a plugin that is invisible in requirements-dev.txt otherwise.
+pytest-asyncio==1.4.0
+
 # The evaluation framework the assignment mandates. Pinned exactly: the
 # stage-1 SDK reconnaissance measures this specific version's API surface,
 # and a floor would let a later resolve move underneath those findings.
