@@ -1,0 +1,40 @@
+# Application dependencies. Pinned exactly, recorded from what `pip install`
+# actually resolved in this project's own .venv -- not copied from a donor
+# project's lockfile, which resolved on a different day against a different
+# index.
+#
+# Versions land here at stage 2, when the first module that needs them is
+# written. Stage 0 deliberately installs nothing from this file: the kickoff
+# gate must be green on a repository with no application code, and a
+# dependency with no importer is noise.
+
+# Agents
+# langchain==
+# langgraph==
+# langgraph-checkpoint-sqlite==
+# langchain-openai==
+# pydantic==
+# pydantic-settings==
+
+# Observability. Langfuse Cloud only -- this project has no docker-compose.yml
+# and no self-hosted Langfuse; the v3 stack needs roughly 5.5 GB of container
+# memory and this machine has 7.9 GB in total.
+# langfuse==
+# opentelemetry-sdk==
+# opentelemetry-exporter-otlp==
+# opentelemetry-instrumentation-httpx==
+
+# Retrieval. ChromaDB only: no graph store, by design (see CLAUDE.md).
+# Embeddings run locally because OpenRouter exposes no embeddings endpoint.
+# chromadb==
+# langchain-chroma==
+# langchain-community==
+# langchain-huggingface==
+# rank-bm25==
+# sentence-transformers==
+# pypdf==
+
+# Tools
+# httpx==
+# trafilatura==
+# ddgs==

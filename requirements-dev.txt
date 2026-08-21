@@ -1,0 +1,20 @@
+# Development gate and evaluation tooling. Installed into .venv before the
+# first gate run; the application requirements only matter from stage 2 on.
+#
+# deepeval lives here rather than in requirements.txt because it is a test
+# tool, not a runtime dependency of the system. That has a consequence worth
+# stating in the README: `deepeval test run tests/` is this assignment's
+# deliverable command, and it needs the dev requirements installed. A cloner
+# who installs only requirements.txt gets tracked tests that cannot run.
+
+black>=24.0
+flake8>=7.0
+mypy>=1.10
+pytest>=8.0
+pytest-randomly>=3.15
+pytest-timeout>=2.3
+
+# The evaluation framework the assignment mandates. Pinned exactly: the
+# stage-1 SDK reconnaissance measures this specific version's API surface,
+# and a floor would let a later resolve move underneath those findings.
+deepeval==4.1.10
