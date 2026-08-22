@@ -1,0 +1,67 @@
+"""Planner component tests -- GEval `Plan Quality` (R2a, `docs/task-hl11.md`).
+
+`_plan_quality_metric` is a factory, not a module-level metric: DeepEval
+4.1.10 raises `DeepEvalError` at **construction** for any metric with no
+`model=`, which would break gate-tier collection of this file if the metric
+were built at import time (measured, `docs/specs/stage-7.md` M1/D7.3).
+`tests/test_component_metric_definitions.py` calls this factory offline,
+with a fake model, to validate the definition without spending anything.
+
+Live inputs are golden `happy_path` cases (`docs/specs/stage-7.md`, D7.13),
+sent to the Planner exactly as production does -- the raw `input` string,
+no template (the Supervisor's own `plan` tool forwards the user's message
+unmodified, `supervisor.py`'s `_make_plan_tool`).
+"""
+
+from __future__ import annotations
+
+import pytest
+from deepeval.evaluate import assert_test
+from deepeval.metrics import GEval
+from deepeval.metrics.base_metric import BaseMetric
+from deepeval.models.base_model import DeepEvalBaseLLM
+from deepeval.test_case import LLMTestCase, SingleTurnParams
+
+from config import Settings
+from tests.conftest import golden_input, judge_model, skip_without_index
+from tests.live_agents import run_agent_live
+
+pytestmark = pytest.mark.eval
+
+
+def _plan_quality_metric(model: DeepEvalBaseLLM) -> GEval:
+    return GEval(
+        name="Plan Quality",
+        evaluation_steps=[
+            "Check that the plan contains specific search queries (not vague)",
+            "Check that sources_to_check includes relevant sources for the topic",
+            "Check that the output_format matches what the user asked for",
+        ],
+        evaluation_params=[SingleTurnParams.INPUT, SingleTurnParams.ACTUAL_OUTPUT],
+        model=model,
+        threshold=0.7,
+    )
+
+
+def _run_case(case_id: str, live_settings: Settings) -> None:
+    skip_without_index()
+    agent_input = golden_input(case_id)
+    live = run_agent_live("planner", agent_input, settings=live_settings)
+    case = LLMTestCase(input=agent_input, actual_output=live.output)
+    assert case.actual_output, f"{case_id}: planner produced no output"
+    metrics: list[BaseMetric] = [_plan_quality_metric(judge_model(live_settings))]
+    assert_test(case, metrics)
+
+
+@pytest.mark.parametrize(
+    "case_id", ["core-single-vs-multi-agent", "core-agent-persona"]
+)
+def test_plan_quality(case_id: str, live_settings: Settings) -> None:
+    _run_case(case_id, live_settings)
+
+
+@pytest.mark.parametrize(
+    "case_id", ["core-tool-calling-role", "core-agent-vs-rag-boundary"]
+)
+def test_plan_has_queries(case_id: str, live_settings: Settings) -> None:
+    _run_case(case_id, live_settings)

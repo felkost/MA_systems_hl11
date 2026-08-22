@@ -1,4 +1,4 @@
-"""`config.py` must put `HF_HOME`/`PIP_CACHE_DIR` into `os.environ` itself.
+"""`config.py` must put the cache-location variables into `os.environ` itself.
 
 Stage 0 measured that pydantic-settings parses `.env` into `Settings` and
 exports nothing: Hugging Face and pip read `os.environ` and nothing else, so
@@ -27,6 +27,7 @@ _CHILD_SCRIPT = (
     "import os\n"
     "print(os.environ['HF_HOME'])\n"
     "print(os.environ['PIP_CACHE_DIR'])\n"
+    "print(os.environ['DEEPEVAL_HOME'])\n"
 )
 
 
@@ -39,6 +40,7 @@ def test_config_exports_cache_paths_to_environ(tmp_path: Path) -> None:
     hostile_env["PYTHONPATH"] = str(PROJECT_ROOT)
     hostile_env["HF_HOME"] = "C:\\Users\\hostile\\hf-cache"
     hostile_env["PIP_CACHE_DIR"] = "C:\\Users\\hostile\\pip-cache"
+    hostile_env["DEEPEVAL_HOME"] = "C:\\Users\\hostile\\.deepeval"
 
     result = subprocess.run(
         [sys.executable, "-c", _CHILD_SCRIPT],
@@ -50,8 +52,10 @@ def test_config_exports_cache_paths_to_environ(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    hf_home, pip_cache_dir = result.stdout.strip().splitlines()
+    hf_home, pip_cache_dir, deepeval_home = result.stdout.strip().splitlines()
     assert hf_home == str(PROJECT_ROOT / ".cache" / "hf")
     assert pip_cache_dir == str(PROJECT_ROOT / ".cache" / "pip")
+    assert deepeval_home == str(PROJECT_ROOT / ".cache" / "deepeval")
     assert "hostile" not in hf_home
     assert "hostile" not in pip_cache_dir
+    assert "hostile" not in deepeval_home
