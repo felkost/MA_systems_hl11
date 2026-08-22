@@ -48,6 +48,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
+from opentelemetry import trace
 
 import tools
 from agents.critic import create_critic_agent
@@ -148,10 +149,11 @@ def _make_plan_tool(
         rendered_input = RESEARCH_INPUT_TEMPLATE.format(
             request=_original_request(state["messages"]), task=task
         )
-        result = planner_graph.invoke(
-            {"messages": [HumanMessage(content=rendered_input)]},
-            config=_sanitized_sub_agent_config(config),
-        )
+        with trace.get_tracer(__name__).start_as_current_span("agent.planner"):
+            result = planner_graph.invoke(
+                {"messages": [HumanMessage(content=rendered_input)]},
+                config=_sanitized_sub_agent_config(config),
+            )
         research_plan = cast(ResearchPlan, result["structured_response"])
         return Command(
             update={
@@ -186,10 +188,11 @@ def _make_research_tool(
         rendered_input = RESEARCH_INPUT_TEMPLATE.format(
             request=_original_request(state["messages"]), task=task
         )
-        result = research_graph.invoke(
-            {"messages": [HumanMessage(content=rendered_input)]},
-            config=_sanitized_sub_agent_config(config),
-        )
+        with trace.get_tracer(__name__).start_as_current_span("agent.researcher"):
+            result = research_graph.invoke(
+                {"messages": [HumanMessage(content=rendered_input)]},
+                config=_sanitized_sub_agent_config(config),
+            )
         return str(result["messages"][-1].content)
 
     return research
@@ -212,10 +215,11 @@ def _make_critique_tool(
         rendered_input = RESEARCH_INPUT_TEMPLATE.format(
             request=_original_request(state["messages"]), task=task
         )
-        result = critic_graph.invoke(
-            {"messages": [HumanMessage(content=rendered_input)]},
-            config=_sanitized_sub_agent_config(config),
-        )
+        with trace.get_tracer(__name__).start_as_current_span("agent.critic"):
+            result = critic_graph.invoke(
+                {"messages": [HumanMessage(content=rendered_input)]},
+                config=_sanitized_sub_agent_config(config),
+            )
         critique_result = cast(CritiqueResult, result["structured_response"])
         return Command(
             update={
@@ -257,6 +261,7 @@ def _supervisor_middleware(settings: Settings) -> list[Any]:
         *agent_middleware(
             tool_call_limit=settings.resolved_supervisor_max_tool_calls(),
             tool_exit_behavior="end",
+            role="supervisor",
         ),
         RoundStabilityMiddleware(),
         SaveReportGuardMiddleware(),
@@ -311,14 +316,18 @@ def create_supervisor(
         settings,
         tools.PLANNER_TOOLS,
         model=role_models["planner"],
-        middleware=agent_middleware(tool_call_limit=PLANNER_TOOL_CALL_LIMIT),
+        middleware=agent_middleware(
+            tool_call_limit=PLANNER_TOOL_CALL_LIMIT, role="planner"
+        ),
     )
     research_graph = create_research_agent(
         settings,
         tools.RESEARCHER_TOOLS,
         model=role_models["researcher"],
         middleware=[
-            *agent_middleware(tool_call_limit=settings.researcher_max_tool_calls),
+            *agent_middleware(
+                tool_call_limit=settings.researcher_max_tool_calls, role="researcher"
+            ),
             ReadUrlCapMiddleware(settings.max_read_url_per_search),
         ],
     )
@@ -327,7 +336,9 @@ def create_supervisor(
         tools.CRITIC_TOOLS,
         model=role_models["critic"],
         middleware=[
-            *agent_middleware(tool_call_limit=settings.critic_max_tool_calls),
+            *agent_middleware(
+                tool_call_limit=settings.critic_max_tool_calls, role="critic"
+            ),
             CriticVerificationMiddleware(),
         ],
     )

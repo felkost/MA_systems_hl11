@@ -37,9 +37,11 @@ from ddgs import DDGS
 from langchain.tools import tool
 from langchain_core.documents import Document
 from langchain_core.tools import BaseTool
+from opentelemetry import trace
 
 import paths
 from config import Settings, load_settings
+from middleware import truncate_for_span
 from retriever import IndexMismatchError, get_retriever
 
 SearchResult = TypedDict(
@@ -270,7 +272,16 @@ def knowledge_search(query: str) -> str:
     if not documents:
         return "No matching passages in the knowledge base."
 
-    return _format_passages(documents, load_settings())
+    settings = load_settings()
+    span = trace.get_current_span()
+    span.set_attribute(
+        "retrieval.chunks",
+        [
+            truncate_for_span(document.page_content, settings.max_span_payload_length)
+            for document in documents
+        ],
+    )
+    return _format_passages(documents, settings)
 
 
 def _format_passages(documents: list[Document], settings: Settings) -> str:

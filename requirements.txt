@@ -18,13 +18,17 @@ langgraph==1.2.11
 pydantic==2.13.4
 pydantic-settings==2.15.0
 
-# Observability. Langfuse Cloud only -- this project has no docker-compose.yml
-# and no self-hosted Langfuse; the v3 stack needs roughly 5.5 GB of container
-# memory and this machine has 7.9 GB in total.
-# langfuse==
-# opentelemetry-sdk==
-# opentelemetry-exporter-otlp==
-# opentelemetry-instrumentation-httpx==
+# Observability (stage 5). Langfuse Cloud only -- this project has no
+# docker-compose.yml and no self-hosted Langfuse; the v3 stack needs roughly
+# 5.5 GB of container memory and this machine has 7.9 GB in total.
+# opentelemetry-exporter-otlp-proto-http, not the opentelemetry-exporter-otlp
+# meta-package (which also bundles a gRPC exporter this project never uses):
+# this is the one langfuse itself depends on and the one actually resolved
+# (docs/specs/stage-5.md, "requirements.txt change").
+langfuse==4.14.4
+opentelemetry-sdk==1.44.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
+opentelemetry-instrumentation-httpx==0.65b0
 
 # Retrieval. ChromaDB only: no graph store, by design (see CLAUDE.md).
 # Embeddings go through OpenRouter (langchain-openai, above); the cross

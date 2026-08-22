@@ -286,6 +286,7 @@ def test_supervisor_middleware_order() -> None:
         ToolErrorMiddleware,
         ToolRetryMiddleware,
         ModelRetryMiddleware,
+        middleware.TracingMiddleware,
         middleware.RoundStabilityMiddleware,
         middleware.SaveReportGuardMiddleware,
         middleware.RevisionCapMiddleware,

@@ -16,6 +16,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from pydantic import SecretStr
 
 import main
+import observability
 from config import Settings
 from tests.fakes import FakeToolCallingModel
 
@@ -303,3 +304,58 @@ def test_build_graph_selects_supervisor_or_orchestrator(monkeypatch: Any) -> Non
         _settings(), "graph", role_models=role_models, checkpointer=None
     )
     assert supervisor_graph is not graph_graph
+
+
+# -- Stage 5, D5.7: each turn opens its own "repl.question" span with a
+# fresh run_id, via OTel Baggage + RunIdStampingProcessor -- not a
+# configure_observability() parameter (that draft was unbuildable, see
+# docs/specs/stage-5.md's "corrected" note on D5.7).
+
+
+def test_run_session_opens_one_repl_question_span_per_turn_with_a_fresh_run_id(
+    monkeypatch: Any,
+) -> None:
+    import supervisor as supervisor_module
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+        InMemorySpanExporter,
+    )
+
+    from tests.test_observability import _reset_otel_global_state
+
+    _fake_save_report(monkeypatch, supervisor_module)
+    network_probe: list[str] = []
+    role_models = _supervisor_role_models(network_probe=network_probe)
+
+    _reset_otel_global_state()
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(observability.RunIdStampingProcessor())
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    from opentelemetry import trace as otel_trace
+
+    otel_trace.set_tracer_provider(provider)
+    try:
+        questions = iter(["q1", "q2", None])
+        main.run_session(
+            _settings(max_revisions=1),
+            orchestration="supervisor",
+            role_models=role_models,
+            checkpointer=MemorySaver(),
+            read_question=lambda: next(questions),
+            write=lambda _: None,
+            resolve_decisions=lambda request: {"decisions": [{"type": "approve"}]},
+        )
+    finally:
+        _reset_otel_global_state()
+
+    question_spans = [
+        s for s in exporter.get_finished_spans() if s.name == "repl.question"
+    ]
+    assert len(question_spans) == 2
+    run_ids = []
+    for span in question_spans:
+        assert span.attributes is not None
+        run_ids.append(span.attributes["run_id"])
+    assert len(set(run_ids)) == 2
