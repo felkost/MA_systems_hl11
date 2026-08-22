@@ -9,15 +9,25 @@ real toggle (`openrouter | local`) because it genuinely has two values -- the
 local Hugging Face branch is the documented offline escape hatch.
 
 `_CacheSettings` is deliberately separate from `Settings`: it exists only to
-put `HF_HOME`/`PIP_CACHE_DIR` into `os.environ` at import time, before any
-Hugging Face import can read them (stage 0's own finding: pydantic-settings
-parses `.env` into `Settings` and exports nothing to the process
-environment, so those variables otherwise do nothing on their own). Its
-`settings_customise_sources` drops the ambient-OS-environment source
-entirely for these two fields -- the CLAUDE.md invariant "`Settings` decides,
-not the ambient environment" applied literally: an already-exported
+put `HF_HOME`/`PIP_CACHE_DIR`/`DEEPEVAL_HOME` into `os.environ` at import
+time, before any Hugging Face or DeepEval import can read them (stage 0's
+own finding: pydantic-settings parses `.env` into `Settings` and exports
+nothing to the process environment, so those variables otherwise do nothing
+on their own). Its `settings_customise_sources` drops the ambient-OS-environment
+source entirely for these three fields -- the CLAUDE.md invariant "`Settings`
+decides, not the ambient environment" applied literally: an already-exported
 `HF_HOME` from some other tool on this machine must not decide where this
 project's model cache lands.
+
+`DEEPEVAL_HOME` joined the other two at stage 7: `import deepeval` writes an
+anonymous telemetry identity file there (measured, stage 7 kickoff --
+`.venv/Lib/site-packages/deepeval/telemetry/identity.py`), and its own
+default is `Path.home() / ".deepeval"` -- `C:\\Users\\...` on this machine,
+the one place CLAUDE.md's Forbidden list bans a cache from landing. With
+`DEEPEVAL_TELEMETRY_OPT_OUT=YES` set (it is, in `.env.example` and in CI)
+no file is written at all and `DEEPEVAL_HOME` never matters in practice --
+it is set anyway so the invariant holds even if telemetry is ever turned
+back on, the same reasoning `.env.example` already gives for that variable.
 """
 
 from __future__ import annotations
@@ -291,6 +301,7 @@ class _CacheSettings(BaseSettings):
 
     hf_home: str = ".cache/hf"
     pip_cache_dir: str = ".cache/pip"
+    deepeval_home: str = ".cache/deepeval"
 
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE,
@@ -311,15 +322,17 @@ class _CacheSettings(BaseSettings):
 
 
 def _export_cache_env() -> None:
-    """Write `HF_HOME`/`PIP_CACHE_DIR` into `os.environ`, project value wins.
+    """Write the cache-location variables into `os.environ`, project value wins.
 
     Runs once at import time -- before any module in this project can import
-    `sentence_transformers` or `huggingface_hub`, both of which read
-    `os.environ` and nothing else (stage 0's finding).
+    `sentence_transformers`, `huggingface_hub`, or `deepeval`, all of which
+    read `os.environ` and nothing else (stage 0's finding, extended to
+    `DEEPEVAL_HOME` at stage 7).
     """
     cache = _CacheSettings()
     os.environ["HF_HOME"] = str(paths.resolve(cache.hf_home))
     os.environ["PIP_CACHE_DIR"] = str(paths.resolve(cache.pip_cache_dir))
+    os.environ["DEEPEVAL_HOME"] = str(paths.resolve(cache.deepeval_home))
 
 
 _export_cache_env()

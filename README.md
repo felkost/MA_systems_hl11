@@ -8,18 +8,19 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 6 of 10 (golden dataset) complete.** The RAG foundation
+> **Status: stage 7 of 10 (component tests) complete.** The RAG foundation
 > (stage 2), the three sub-agents (stage 3), both coordination paths —
 > the agent-as-tool Supervisor and the explicit `StateGraph` — with the
-> REPL that drives either one (stage 4), and observability (stage 5,
-> OpenTelemetry + optional Langfuse Cloud + offline span dumps) are all
-> built and run for real. `python main.py` reaches a human-in-the-loop gate
-> before it ever writes a report. This stage adds `tests/golden_dataset.json`
-> — 15 hand-reviewed cases, five per category — plus its schema tests and
-> two adversarial fixture files. **The DeepEval test suite itself does not
-> exist yet** — component tests, tool-correctness tests, and the
-> end-to-end evaluation are stages 7 to 9. Sections marked *(planned)*
-> below describe what is coming, not what runs today.
+> REPL that drives either one (stage 4), observability (stage 5,
+> OpenTelemetry + optional Langfuse Cloud + offline span dumps), and the
+> 15-case golden dataset (stage 6) are all built and run for real.
+> `python main.py` reaches a human-in-the-loop gate before it ever writes a
+> report. This stage adds the first three **DeepEval** metrics — Plan
+> Quality, Critique Quality and Groundedness — measured against real live
+> agent runs, with their first baseline recorded below. **Tool-correctness
+> tests and the end-to-end evaluation do not exist yet** — those are
+> stages 8 and 9. Sections marked *(planned)* below describe what is
+> coming, not what runs today.
 
 ## Architecture
 
@@ -94,20 +95,42 @@ The evaluation tier is excluded from the gate and runs in CI only on manual
 dispatch. A test that goes red because a judge model drifted teaches everyone
 to ignore a red CI, and a CI nobody trusts stops catching real breakage.
 
-### What is measured *(planned — stages 6 to 9)*
+### What is measured
 
-| Metric | Kind | Target |
-|---|---|---|
-| Plan Quality | GEval | Planner |
-| Critique Quality | GEval | Critic |
-| Groundedness | GEval, over retrieval context | Researcher |
-| Tool Correctness | deterministic | Planner, Researcher, Supervisor |
-| Answer Relevancy | built-in | whole system |
-| Correctness | GEval, against expected output | whole system |
-| Citation Presence | **custom GEval** | whole system |
+| Metric | Kind | Target | State |
+|---|---|---|---|
+| Plan Quality | GEval | Planner | **built** (stage 7) |
+| Critique Quality | GEval | Critic | **built** (stage 7) |
+| Groundedness | GEval, over retrieval context | Researcher | **built** (stage 7) |
+| Tool Correctness | deterministic | Planner, Researcher, Supervisor | *planned (stage 8)* |
+| Answer Relevancy | built-in | whole system | *planned (stage 9)* |
+| Correctness | GEval, against expected output | whole system | *planned (stage 9)* |
+| Citation Presence | **custom GEval** | whole system | *planned (stage 9)* |
 
 Against a golden dataset of **15 cases** in `tests/golden_dataset.json`: five
 happy-path, five edge-case, five failure-case.
+
+### First baseline — component tests, stage 7
+
+One run, `n` as stated. **No confidence intervals. The judge is not
+validated against human labels.** Judge: `google/gemini-2.5-pro`.
+
+| Test | n | Metric | Threshold | Result |
+|---|---|---|---|---|
+| `test_plan_quality` | 2 | Plan Quality | 0.7 | pass |
+| `test_plan_has_queries` | 2 | Plan Quality | 0.7 | pass |
+| `test_research_grounded` | 2 | Groundedness | 0.7 | **0.6 — below** |
+| `test_research_edge_case` | 1 | Groundedness | 0.7 | pass |
+| `test_critique_approve` | 1 | Critique Quality | 0.7 | pass |
+| `test_critique_revise` | 1 | Critique Quality | 0.7 | pass |
+
+**7 of 9 passed.** The two red cases are a low score, not an execution
+error, and the cause is structural rather than a regression:
+**`Groundedness` here measures *corpus*-groundedness.** The retrieval
+context is built from `knowledge_search` results only — nothing captures
+what `web_search` and `read_url` return in a form the metric can see — so a
+correct, web-sourced claim is counted ungrounded by construction. That
+number is a starting baseline with a named cause, not a threshold to lower.
 
 ### How to read the numbers
 
