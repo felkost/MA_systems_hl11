@@ -13,8 +13,10 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.util._once import Once
+from pydantic import SecretStr
 
 import tools
+from config import Settings
 
 
 @pytest.fixture(autouse=True)
@@ -43,6 +45,18 @@ def test_knowledge_search_records_retrieval_chunks_on_current_span(
         ),
     ]
     monkeypatch.setattr(tools, "get_retriever", lambda: _FakeRetriever(documents))
+    # tools.knowledge_search calls load_settings() internally, which reads
+    # OPENROUTER_API_KEY from the environment/.env -- absent in a fresh
+    # clone or CI (CLAUDE.md's own gate-tier rule: every test that builds
+    # Settings passes the key explicitly, per tests/test_retriever_manifest.py's
+    # established convention). A gate test passing locally only because the
+    # author's own .env supplies a key is exactly the "green gate outside
+    # .venv/CI is not evidence of anything" trap.
+    monkeypatch.setattr(
+        tools,
+        "load_settings",
+        lambda: Settings(openrouter_api_key=SecretStr("test-key")),
+    )
 
     tracer = otel_trace.get_tracer(__name__)
     with tracer.start_as_current_span("tool.knowledge_search"):
