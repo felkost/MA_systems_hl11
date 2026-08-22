@@ -1,22 +1,27 @@
-"""No tracked Python module mentions Neo4j or `graph_search`.
+"""No tracked Python module actually reintroduces a graph store.
 
-CLAUDE.md's Forbidden list bans a graph store outright (see "Three deliberate
-removals" -- a graph store is a second source of truth this assignment does
-not measure). Scoped to `.py` files, not every tracked file: CLAUDE.md and
-`insights.md` legitimately *discuss* the removed Neo4j/`graph_search` tool as
-history, which is prose about a decision, not a place either could resurface
-as code.
+CLAUDE.md's Forbidden list bans a graph store outright (see "Three
+deliberate removals" -- a graph store is a second source of truth this
+assignment does not measure).
+
+Checked with `ast`, not a text search: a naive substring search on
+`"graph_search"`/`"neo4j"` also matches every *legitimate* mention --
+CLAUDE.md and `insights.md` discussing the removal as history, this
+module's own docstring saying "minus `graph_search`", and
+`test_tools_allowlists.py`'s own `assert "graph_search" not in names`
+checks that graph_search stays absent. What actually indicates
+reintroduction is narrower: an `import neo4j` / `from neo4j import ...`, or
+a function actually named `graph_search`.
 """
 
 from __future__ import annotations
 
+import ast
 import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 THIS_FILE = Path(__file__).resolve()
-
-_FORBIDDEN_TERMS = ("neo4j", "graph_search")
 
 
 def _tracked_python_files() -> list[Path]:
@@ -30,16 +35,33 @@ def _tracked_python_files() -> list[Path]:
     return [PROJECT_ROOT / line for line in result.stdout.splitlines() if line]
 
 
-def test_no_tracked_python_file_mentions_neo4j_or_graph_search() -> None:
+def _reintroduces_graph_store(path: Path) -> list[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    hits: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            hits.extend(
+                f"import {alias.name}"
+                for alias in node.names
+                if alias.name.split(".")[0] == "neo4j"
+            )
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and node.module.split(".")[0] == "neo4j":
+                hits.append(f"from {node.module} import ...")
+        elif isinstance(node, ast.FunctionDef) and node.name == "graph_search":
+            hits.append(f"def graph_search (line {node.lineno})")
+    return hits
+
+
+def test_no_tracked_python_file_reintroduces_a_graph_store() -> None:
     offenders = []
     for path in _tracked_python_files():
         if path.resolve() == THIS_FILE:
-            continue  # this file names the forbidden terms to check for them
-        lowered = path.read_text(encoding="utf-8").lower()
-        hits = [term for term in _FORBIDDEN_TERMS if term in lowered]
+            continue  # this file names neo4j/graph_search to check for them
+        hits = _reintroduces_graph_store(path)
         if hits:
             offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {hits}")
 
     assert (
         not offenders
-    ), "tracked Python files still reference a graph store: " + "; ".join(offenders)
+    ), "tracked Python files reintroduce a graph store: " + "; ".join(offenders)
