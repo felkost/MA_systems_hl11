@@ -8,17 +8,17 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 5 of 10 (observability) complete.** The RAG foundation
-> (stage 2), the three sub-agents (stage 3), and both coordination paths —
+> **Status: stage 6 of 10 (golden dataset) complete.** The RAG foundation
+> (stage 2), the three sub-agents (stage 3), both coordination paths —
 > the agent-as-tool Supervisor and the explicit `StateGraph` — with the
-> REPL that drives either one (stage 4) are all built and run for real.
-> `python main.py` reaches a human-in-the-loop gate before it ever writes a
-> report. This stage adds a single OpenTelemetry `TracerProvider` per
-> process, an offline `runs/<run_id>/spans.json` dump the evaluation
-> pipeline reads with no external service, optional Langfuse Cloud tracing
-> (`TRACING_ENABLED=true`), rotated file logs, and cost/latency computed
-> from token counts. **The golden dataset and the DeepEval test suite do
-> not exist yet** — that is stages 6 to 9. Sections marked *(planned)*
+> REPL that drives either one (stage 4), and observability (stage 5,
+> OpenTelemetry + optional Langfuse Cloud + offline span dumps) are all
+> built and run for real. `python main.py` reaches a human-in-the-loop gate
+> before it ever writes a report. This stage adds `tests/golden_dataset.json`
+> — 15 hand-reviewed cases, five per category — plus its schema tests and
+> two adversarial fixture files. **The DeepEval test suite itself does not
+> exist yet** — component tests, tool-correctness tests, and the
+> end-to-end evaluation are stages 7 to 9. Sections marked *(planned)*
 > below describe what is coming, not what runs today.
 
 ## Architecture
