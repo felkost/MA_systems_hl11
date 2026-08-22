@@ -74,8 +74,11 @@ def log_path(service: str, log_dir: str | Path = "logs") -> Path:
 
 
 def checkpoint_path(db: str | Path) -> Path:
-    """Locate the crash-safe checkpoint database, creating its parent
-    directory if missing.
+    """Locate the checkpoint database, creating its parent directory if
+    missing.
+
+    Has no caller: stage 4 checkpoints in memory, so nothing in the shipped
+    system is crash-safe. Kept for the stage that adds a durable backend.
 
     Parameters
     ----------

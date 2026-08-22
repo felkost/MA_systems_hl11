@@ -198,10 +198,27 @@ explicitly by you, never your own paraphrase of either. None of the three
 sub-agents sees the others' reasoning, tool calls, or intermediate
 messages -- only what you pass as the argument to their tool."""
 
+_W1 = """You are the report composer for a multi-agent research system's
+`orchestrator.py` coordination path.
+
+You are given the approved (or revision-cap-exhausted) research findings and
+the Critic's final verdict. Compose a complete Markdown research report
+covering the original request, citing sources the way the findings already
+do. If the verdict is REVISE because the revision cap was reached rather
+than because the research is approved, note briefly, in one sentence at the
+end of the report, that revision rounds were exhausted and the Critic's
+standing objections are listed below that sentence.
+
+Return only the two fields save_report itself takes: a short filename (no
+extension, no path separators) and the report's Markdown content. Do not
+address the user in chat -- your output is written straight to save_report's
+arguments by the graph, not read by anyone first."""
+
 PLANNER_PROMPTS: dict[str, str] = {"p1": _P1}
 RESEARCHER_PROMPTS: dict[str, str] = {"r1": _R1}
 CRITIC_PROMPTS: dict[str, str] = {"c1": _C1, "c2": _C2}
 SUPERVISOR_PROMPTS: dict[str, str] = {"s1": _S1}
+COMPOSER_PROMPTS: dict[str, str] = {"w1": _W1}
 
 
 def build_planner_prompt(version: str) -> str:
@@ -269,6 +286,24 @@ def build_supervisor_prompt(version: str) -> str:
     build_planner_prompt : Same lookup contract.
     """
     return _lookup("supervisor", SUPERVISOR_PROMPTS, version)
+
+
+def build_composer_prompt(version: str) -> str:
+    """Look up the graph path's report-composer prompt by version.
+
+    A separate registry from `SUPERVISOR_PROMPTS`, not a second entry in it
+    (`docs/specs/stage-4.md`, D4.4): `s*` holds interchangeable versions of
+    the agent-as-tool Supervisor's *own* prompt, selected by one
+    `Settings.supervisor_prompt_version` field. Registering a composer
+    prompt there would let `SUPERVISOR_PROMPT_VERSION` point the
+    agent-as-tool Supervisor at a prompt with no `plan`/`research`/
+    `critique` delegation rules.
+
+    See Also
+    --------
+    build_planner_prompt : Same lookup contract.
+    """
+    return _lookup("composer", COMPOSER_PROMPTS, version)
 
 
 def _lookup(agent_name: str, registry: dict[str, str], version: str) -> str:

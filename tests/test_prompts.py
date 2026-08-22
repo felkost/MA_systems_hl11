@@ -15,6 +15,7 @@ from datetime import date
 import pytest
 
 from prompts import (
+    build_composer_prompt,
     build_critic_prompt,
     build_planner_prompt,
     build_researcher_prompt,
@@ -66,3 +67,19 @@ def test_critic_prompt_c1_and_c2_both_registered() -> None:
     c1 = build_critic_prompt("c1", today=date(2026, 8, 22))
     c2 = build_critic_prompt("c2", today=date(2026, 8, 22))
     assert c1 != c2
+
+
+def test_build_composer_prompt_raises_on_unknown_version() -> None:
+    with pytest.raises(KeyError):
+        build_composer_prompt("w99")
+
+
+def test_composer_prompt_is_a_separate_registry_from_the_supervisor() -> None:
+    # D4.4: a composer prompt must not be reachable through
+    # `build_supervisor_prompt` -- registering it in `s*` would let
+    # `SUPERVISOR_PROMPT_VERSION="w1"` hand the agent-as-tool Supervisor a
+    # composer prompt with no delegation rules.
+    composer = build_composer_prompt("w1")
+    assert "plan, research, critique" not in composer
+    with pytest.raises(KeyError):
+        build_supervisor_prompt("w1")

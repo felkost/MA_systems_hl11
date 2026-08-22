@@ -75,6 +75,7 @@ class Settings(BaseSettings):
     researcher_prompt_version: str = "r1"
     critic_prompt_version: str = "c2"
     supervisor_prompt_version: str = "s1"
+    composer_prompt_version: str = "w1"
 
     # -- Supervisor / revision loop
     max_revisions: int = Field(default=2, ge=1, le=3)
@@ -82,6 +83,12 @@ class Settings(BaseSettings):
     researcher_max_tool_calls: int = Field(default=8, ge=1, le=50)
     critic_max_tool_calls: int = Field(default=5, ge=1, le=50)
     max_read_url_per_search: int | None = Field(default=2, ge=1, le=10)
+    # No default: `resolved_supervisor_max_tool_calls` derives a headroom-
+    # aware value from `max_revisions` when this is left unset (stage-4 spec
+    # D4.13) -- a fixed default sized for one `max_revisions` value is wrong
+    # for the others, since the worst-case legitimate call count scales with
+    # the cap itself.
+    supervisor_max_tool_calls: int | None = Field(default=None, ge=1, le=200)
 
     # -- Tools (tools.py)
     max_search_results: int = Field(default=5, ge=1, le=10)
@@ -116,8 +123,12 @@ class Settings(BaseSettings):
     embedding_model: str = "openai/text-embedding-3-small"
     embedding_dimensions: int | None = Field(default=None, ge=64, le=3072)
 
-    # -- HITL checkpoint (stage 4): the Supervisor's own checkpointer, never
-    # a sub-agent's (CLAUDE.md invariant).
+    # -- HITL checkpoint: unused. Stage 4 runs `MemorySaver` on the
+    # Supervisor and on the compiled orchestrator graph -- never a
+    # sub-agent's (CLAUDE.md invariant) -- because
+    # `langgraph-checkpoint-sqlite` is not a dependency and an in-process
+    # REPL session needs no cross-process durability. The field and
+    # `paths.checkpoint_path` wait for a stage that adds the backend.
     checkpoint_db: str = "runtime/checkpoints.sqlite"
 
     # -- Observability (stage 5), Langfuse Cloud only -- no docker-compose.yml
@@ -163,6 +174,29 @@ class Settings(BaseSettings):
             raise ValueError(f"unknown role {role!r}, expected one of {self.ROLES}")
         override: str | None = getattr(self, f"{role}_model_name")
         return override or self.model_name
+
+    def resolved_supervisor_max_tool_calls(self) -> int:
+        """The Supervisor's blanket tool-call budget.
+
+        Returns
+        -------
+        int
+            `supervisor_max_tool_calls` if set, else a derived value:
+            `1 (plan) + 2 * (max_revisions + 1) (research + critique) + 1
+            (save_report) + 3` headroom. The bare worst-case count is below
+            what it needs to be for a larger `max_revisions` -- a fixed
+            default sized at one value starves the others. Headroom
+            accounting, measured against the installed
+            `HumanInTheLoopMiddleware`/`ToolCallLimitMiddleware`: one HITL
+            reject costs one re-emitted `save_report`, one refused extra
+            `critique` costs one more, so a headroom of 2 is exactly
+            consumed by one of each -- and hl10 measured a live
+            double-reject. 3 covers the double-reject plus one refusal
+            (`docs/specs/stage-4.md`, D4.13).
+        """
+        if self.supervisor_max_tool_calls is not None:
+            return self.supervisor_max_tool_calls
+        return 1 + 2 * (self.max_revisions + 1) + 1 + 3
 
     @model_validator(mode="after")
     def _model_names_are_openrouter_ids(self) -> Settings:

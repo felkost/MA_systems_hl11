@@ -42,7 +42,7 @@ wired.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from langchain.agents.middleware import (
     ModelCallLimitMiddleware,
@@ -436,6 +436,194 @@ class SaveReportGuardMiddleware(
         )
 
 
+class RevisionCapMiddleware(
+    AgentMiddleware[AgentState[ResponseT], ContextT, ResponseT]
+):
+    """The Supervisor's per-question revision cap (stage-4 spec D4.5).
+
+    Refuses a `critique` call once `max_revisions + 1` calls have already
+    been emitted since the most recent `HumanMessage`. Counts **emitted**
+    calls (`_run_tool_call_ids`), not executed ones -- an earlier draft of
+    this design counted `ToolMessage`s instead, on the reasoning that a
+    stability-refused `critique` should not consume a slot. That reasoning
+    was false (a refusal *is* a `ToolMessage`, `_tool_results` indexes it
+    with no status filter) and additionally blind to same-batch calls
+    (`ToolCallRequest.state` is fixed at tool-node entry, so two `critique`
+    calls in one `AIMessage` are both invisible to an executed count at the
+    time either one runs). The emitted count has neither defect and matches
+    `RoundStabilityMiddleware`'s own counting exactly.
+
+    Scoped to "since the most recent `HumanMessage`", not to the checkpointed
+    thread: neither `ToolCallLimitMiddleware` mode fits here.
+    `thread_limit` never resets, starving the second question of a session;
+    `run_limit` lives in an `UntrackedValue` channel that resets on every
+    `Command(resume=...)`, so a human pause silently refills the budget
+    (both measured against the installed langgraph).
+
+    Defines **both** `wrap_tool_call` and `awrap_tool_call` (D3.1b).
+    """
+
+    def __init__(self, max_revisions: int) -> None:
+        super().__init__()
+        self.max_revisions = max_revisions
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command[Any]],
+    ) -> ToolMessage | Command[Any]:
+        refusal = self._refusal(request)
+        if refusal is not None:
+            return refusal
+        return handler(request)
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]],
+    ) -> ToolMessage | Command[Any]:
+        refusal = self._refusal(request)
+        if refusal is not None:
+            return refusal
+        return await handler(request)
+
+    def _refusal(self, request: ToolCallRequest) -> ToolMessage | None:
+        if request.tool_call["name"] != "critique":
+            return None
+
+        messages = cast("list[BaseMessage]", request.state["messages"])
+        call_id = request.tool_call["id"]
+        limit = self.max_revisions + 1
+        if emitted_critique_count(messages, exclude_call_id=call_id) < limit:
+            return None
+
+        return ToolMessage(
+            content=(
+                f"ERROR: critique call refused -- the revision cap "
+                f"({self.max_revisions} revision(s), {limit} critique "
+                "call(s) total) is reached for this question. Compose the "
+                "final report with the findings and verdict you already "
+                "have and call save_report."
+            ),
+            tool_call_id=call_id,
+            name="critique",
+            status="error",
+        )
+
+
+def emitted_critique_count(
+    messages: list[BaseMessage], *, exclude_call_id: str | None = None
+) -> int:
+    """How many `critique` calls have been emitted since the most recent
+    `HumanMessage`, optionally excluding one in-flight call id.
+
+    Shared between `RevisionCapMiddleware` (the cap itself) and
+    `supervisor.py`'s verdict guard (D4.18), so both read "rounds remain"
+    off the same counter -- one lifecycle on the supervisor path, not two.
+    """
+    ids = _run_tool_call_ids(messages, "critique")
+    if exclude_call_id is not None:
+        ids = [call_id for call_id in ids if call_id != exclude_call_id]
+    return len(ids)
+
+
+class SaveReportVerdictGuardMiddleware(
+    AgentMiddleware[AgentState[ResponseT], ContextT, ResponseT]
+):
+    """Refuses `save_report` on a non-APPROVE verdict while revision rounds
+    remain (stage-4 spec D4.18).
+
+    Refuses when, since the most recent `HumanMessage`: no non-error
+    `critique` `ToolMessage` exists at all, **or** the standing
+    `state["verdict"]` is not `"APPROVE"` and `emitted_critique_count` is
+    below `max_revisions + 1`.
+
+    A **non-error** critique `ToolMessage` is required before the verdict is
+    honoured -- an *emitted* gate is not enough: a critique whose execution
+    raises (`ToolErrorMiddleware`'s `ERROR:` message, no `Command` state
+    write) would leave the gate satisfied while `state["verdict"]` still
+    holds a *previous question's* checkpointed `APPROVE`, waving a premature
+    save through on a stale verdict -- the exact trap
+    `SaveReportGuardMiddleware`'s own docstring names for a different field.
+
+    Once the cap is exhausted (`emitted_critique_count >= max_revisions + 1`)
+    a REVISE verdict may still save: `_S1` rule 5 orders a save once the
+    model "stopped revising for any reason", and a strict
+    `verdict != "APPROVE"` refusal would deadlock against that -- the router
+    would send the model back with no report ever produced.
+
+    The refusal `ToolMessage`'s own text is the only nudge back toward
+    `critique` while rounds remain; `SaveReportGuardMiddleware` nudges only
+    on an APPROVE-unsaved response, not this case.
+
+    Defines **both** `wrap_tool_call` and `awrap_tool_call` (D3.1b).
+    """
+
+    def __init__(self, max_revisions: int) -> None:
+        super().__init__()
+        self.max_revisions = max_revisions
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command[Any]],
+    ) -> ToolMessage | Command[Any]:
+        refusal = self._refusal(request)
+        if refusal is not None:
+            return refusal
+        return handler(request)
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]],
+    ) -> ToolMessage | Command[Any]:
+        refusal = self._refusal(request)
+        if refusal is not None:
+            return refusal
+        return await handler(request)
+
+    def _refusal(self, request: ToolCallRequest) -> ToolMessage | None:
+        if request.tool_call["name"] != "save_report":
+            return None
+
+        messages = cast("list[BaseMessage]", request.state["messages"])
+        call_id = request.tool_call["id"]
+
+        critique_ids = _run_tool_call_ids(messages, "critique")
+        critique_results = _tool_results(messages, critique_ids)
+        non_error_verdicted = any(
+            not result.startswith("ERROR:") for result in critique_results
+        )
+        if not non_error_verdicted:
+            return self._refusal_message(
+                call_id,
+                "no completed critique exists yet this question -- call "
+                "critique first",
+            )
+
+        if request.state.get("verdict") == "APPROVE":
+            return None
+
+        limit = self.max_revisions + 1
+        if emitted_critique_count(messages) < limit:
+            return self._refusal_message(
+                call_id,
+                "the verdict is not APPROVE and revision rounds remain -- "
+                "call critique again before saving",
+            )
+        return None
+
+    @staticmethod
+    def _refusal_message(call_id: str | None, reason: str) -> ToolMessage:
+        return ToolMessage(
+            content=f"ERROR: save_report call refused -- {reason}.",
+            tool_call_id=call_id,
+            name="save_report",
+            status="error",
+        )
+
+
 def _tool_error_to_message(exc: Exception, request: ToolCallRequest) -> str:
     """Names the exception type rather than echoing its message, keeping
     internal detail out of the model's context, while preserving this
@@ -444,7 +632,10 @@ def _tool_error_to_message(exc: Exception, request: ToolCallRequest) -> str:
 
 
 def agent_middleware(
-    *, tool_call_limit: int, model_call_limit: int = _MODEL_CALL_LIMIT
+    *,
+    tool_call_limit: int,
+    model_call_limit: int = _MODEL_CALL_LIMIT,
+    tool_exit_behavior: Literal["continue", "error", "end"] = "continue",
 ) -> list[AgentMiddleware[Any, Any, Any]]:
     """The shared middleware stack every sub-agent's caller assembles.
 
@@ -456,6 +647,15 @@ def agent_middleware(
         Per-run model-call budget -- the only bound on a model that loops
         producing text without tool calls, which `ToolCallLimitMiddleware`
         cannot see.
+    tool_exit_behavior : "continue" | "error" | "end", default "continue"
+        Forwarded to `ToolCallLimitMiddleware`. The three sub-agents keep
+        the library default; the Supervisor (stage-4 spec D4.15) passes
+        `"end"` -- with `"continue"`, a blocked call stays visible in
+        `last_ai_message.tool_calls` and `HumanInTheLoopMiddleware` still
+        interrupts for it (measured: ordering the Supervisor's middleware
+        list cannot prevent this on its own), asking a human to approve a
+        write that cannot happen. `"end"` jumps past the remaining
+        `after_model` hooks instead, so an exhausted budget ends the run.
 
     Returns
     -------
@@ -478,7 +678,9 @@ def agent_middleware(
     """
     return [
         ModelCallLimitMiddleware(run_limit=model_call_limit),
-        ToolCallLimitMiddleware(run_limit=tool_call_limit),
+        ToolCallLimitMiddleware(
+            run_limit=tool_call_limit, exit_behavior=tool_exit_behavior
+        ),
         ToolErrorMiddleware(_tool_error_to_message),
         ToolRetryMiddleware(on_failure="error", jitter=True),
         ModelRetryMiddleware(),
