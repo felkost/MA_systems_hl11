@@ -60,6 +60,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command, interrupt
+from opentelemetry import trace
 
 import hitl
 import tools
@@ -70,6 +71,7 @@ from config import Settings
 from middleware import (
     CriticVerificationMiddleware,
     ReadUrlCapMiddleware,
+    TracingMiddleware,
     agent_middleware,
 )
 from prompts import build_composer_prompt
@@ -143,14 +145,18 @@ def create_orchestrator_graph(
         settings,
         tools.PLANNER_TOOLS,
         model=role_models["planner"],
-        middleware=agent_middleware(tool_call_limit=PLANNER_TOOL_CALL_LIMIT),
+        middleware=agent_middleware(
+            tool_call_limit=PLANNER_TOOL_CALL_LIMIT, role="planner"
+        ),
     )
     research_graph = create_research_agent(
         settings,
         tools.RESEARCHER_TOOLS,
         model=role_models["researcher"],
         middleware=[
-            *agent_middleware(tool_call_limit=settings.researcher_max_tool_calls),
+            *agent_middleware(
+                tool_call_limit=settings.researcher_max_tool_calls, role="researcher"
+            ),
             ReadUrlCapMiddleware(settings.max_read_url_per_search),
         ],
     )
@@ -159,7 +165,9 @@ def create_orchestrator_graph(
         tools.CRITIC_TOOLS,
         model=role_models["critic"],
         middleware=[
-            *agent_middleware(tool_call_limit=settings.critic_max_tool_calls),
+            *agent_middleware(
+                tool_call_limit=settings.critic_max_tool_calls, role="critic"
+            ),
             CriticVerificationMiddleware(),
         ],
     )
@@ -168,11 +176,22 @@ def create_orchestrator_graph(
         tools=[],
         system_prompt=build_composer_prompt(settings.composer_prompt_version),
         response_format=ProviderStrategy(ReportDraft, strict=True),
+        # No agent_middleware() stack -- the composer has no tools, so the
+        # tool-call-limit/retry machinery has nothing to guard. TracingMiddleware
+        # alone still gets its model-call span (D5.9/D5.10's own gap, found
+        # during implementation: composer_graph previously had no middleware
+        # list at all, so its model calls would have been invisible to the
+        # "every agent call, not just the top-level" requirement the plan's
+        # own Langfuse-rules table states).
+        middleware=[TracingMiddleware(role="composer")],
     )
 
     def planner_node(state: OrchestratorState) -> dict[str, Any]:
         original = _original_request(state["messages"])
-        result = planner_graph.invoke({"messages": [HumanMessage(content=original)]})
+        with trace.get_tracer(__name__).start_as_current_span("agent.planner"):
+            result = planner_graph.invoke(
+                {"messages": [HumanMessage(content=original)]}
+            )
         return {
             "plan": cast(ResearchPlan, result["structured_response"]),
             "revision_round": 0,
@@ -201,9 +220,10 @@ def create_orchestrator_graph(
         rendered_input = RESEARCH_INPUT_TEMPLATE.format(
             request=_original_request(state["messages"]), task=task
         )
-        result = research_graph.invoke(
-            {"messages": [HumanMessage(content=rendered_input)]}
-        )
+        with trace.get_tracer(__name__).start_as_current_span("agent.researcher"):
+            result = research_graph.invoke(
+                {"messages": [HumanMessage(content=rendered_input)]}
+            )
         return {"latest_findings": str(result["messages"][-1].content)}
 
     def critic_node(state: OrchestratorState) -> dict[str, Any]:
@@ -212,9 +232,10 @@ def create_orchestrator_graph(
         rendered_input = RESEARCH_INPUT_TEMPLATE.format(
             request=_original_request(state["messages"]), task=findings
         )
-        result = critic_graph.invoke(
-            {"messages": [HumanMessage(content=rendered_input)]}
-        )
+        with trace.get_tracer(__name__).start_as_current_span("agent.critic"):
+            result = critic_graph.invoke(
+                {"messages": [HumanMessage(content=rendered_input)]}
+            )
         critique = cast(CritiqueResult, result["structured_response"])
         update: dict[str, Any] = {"latest_critique": critique}
         if critique.verdict != "APPROVE":
@@ -260,9 +281,10 @@ def create_orchestrator_graph(
                 "Compose the report from what exists and note this in one "
                 "sentence at the end, followed by the Critic's standing gaps."
             )
-        result = composer_graph.invoke(
-            {"messages": [HumanMessage(content="\n\n".join(task_lines))]}
-        )
+        with trace.get_tracer(__name__).start_as_current_span("agent.composer"):
+            result = composer_graph.invoke(
+                {"messages": [HumanMessage(content="\n\n".join(task_lines))]}
+            )
         draft = cast(ReportDraft, result["structured_response"])
         return {"report_draft": draft}
 
@@ -295,9 +317,10 @@ def create_orchestrator_graph(
     def save_node(state: OrchestratorState) -> dict[str, Any]:
         draft = state["report_draft"]
         assert draft is not None
-        result = save_report_tool.invoke(
-            {"filename": draft.filename, "content": draft.content}
-        )
+        with trace.get_tracer(__name__).start_as_current_span("tool.save_report"):
+            result = save_report_tool.invoke(
+                {"filename": draft.filename, "content": draft.content}
+            )
         return {"messages": [AIMessage(content=str(result))]}
 
     graph = StateGraph(OrchestratorState)

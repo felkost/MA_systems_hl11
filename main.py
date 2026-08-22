@@ -37,9 +37,11 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
+from opentelemetry import baggage, context, trace
 
 import hitl
 import models
+import observability
 import orchestrator
 import supervisor
 from config import Settings, load_settings
@@ -193,9 +195,26 @@ def run_session(
         if question is None:
             return tid
         payload: Any = {"messages": [HumanMessage(content=question)]}
-        _drive_turn(
-            graph, payload, config, write=write, resolve_decisions=resolve_decisions
-        )
+        # D5.7: run_id is fresh per turn, not the session's thread_id --
+        # "one question = one trace" (docs/specs/stage-5.md). Rides OTel's
+        # own Baggage so RunIdStampingProcessor can stamp it onto every
+        # span this turn creates, without threading it through
+        # supervisor.py/orchestrator.py/middleware.py by hand.
+        run_id = str(uuid4())
+        token = context.attach(baggage.set_baggage("run_id", run_id))
+        try:
+            with trace.get_tracer(__name__).start_as_current_span(
+                "repl.question", attributes={"run_id": run_id}
+            ):
+                _drive_turn(
+                    graph,
+                    payload,
+                    config,
+                    write=write,
+                    resolve_decisions=resolve_decisions,
+                )
+        finally:
+            context.detach(token)
 
 
 def _stdin_reader(prompt: str = "> ") -> Callable[[], str | None]:
@@ -242,17 +261,24 @@ def main(argv: Sequence[str] = ()) -> None:
         else interactive_decisions(read=input, write=print)
     )
 
-    print(f"Session thread_id: {(tid := str(uuid4()))}")
-    run_session(
-        settings,
-        orchestration=orchestration,
-        role_models=role_models,
-        checkpointer=MemorySaver(),
-        read_question=_stdin_reader(),
-        write=print,
-        resolve_decisions=resolve_decisions,
-        thread_id=tid,
-    )
+    # Built once per process (D5.3/D5.11/D5.13) -- only main.py (interface)
+    # imports observability.py; every other layer reaches OpenTelemetry's
+    # ambient global tracer directly.
+    handle = observability.configure_observability(settings)
+    try:
+        print(f"Session thread_id: {(tid := str(uuid4()))}")
+        run_session(
+            settings,
+            orchestration=orchestration,
+            role_models=role_models,
+            checkpointer=MemorySaver(),
+            read_question=_stdin_reader(),
+            write=print,
+            resolve_decisions=resolve_decisions,
+            thread_id=tid,
+        )
+    finally:
+        handle.shutdown()
 
 
 if __name__ == "__main__":

@@ -41,6 +41,7 @@ wired.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
 from typing import Any, Literal, cast
 
@@ -63,7 +64,9 @@ from langchain.agents.structured_output import ProviderStrategy
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
+from opentelemetry import trace
 
+from models import compute_cost
 from prompts import CRITIC_VERIFICATION_INSTRUCTION
 
 _VERIFICATION_TOOLS = frozenset({"web_search", "read_url", "knowledge_search"})
@@ -624,6 +627,141 @@ class SaveReportVerdictGuardMiddleware(
         )
 
 
+def truncate_for_span(text: str, max_length: int) -> str:
+    """Cap `text` at `max_length`, marking that it was cut.
+
+    Used by both this module's `TracingMiddleware` (`tool.args`/
+    `tool.result`) and `tools.py`'s `knowledge_search` (`retrieval.chunks`,
+    `docs/specs/stage-5.md` D5.8) -- both infra, so this lives here rather
+    than in `observability.py` (obs), which infra may not import
+    (`tests/test_layering.py`'s `MAY_IMPORT[INFRA]` has no `OBS` entry).
+    """
+    if len(text) <= max_length:
+        return text
+    return f"{text[:max_length]}...[truncated, {len(text)} chars total]"
+
+
+class TracingMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, ResponseT]):
+    """One span per model call (`model.<role>`, token usage and cost as
+    attributes) and one per tool call (`tool.<name>`, args and result,
+    both truncated) -- appended to every sub-agent's and the Supervisor's
+    own `agent_middleware()` stack (stage 5, `docs/specs/stage-5.md`,
+    D5.10). Reaches OpenTelemetry's ambient global tracer directly
+    (`trace.get_tracer(__name__)`), never `observability.py` itself (D5.3)
+    -- the span this creates nests under whatever `main.py`'s per-turn
+    `repl.question` span or a delegation-site `agent.<role>` span (D5.9)
+    currently has open, via the same `contextvars`-backed propagation
+    OpenTelemetry already provides with no explicit wiring.
+
+    Defines **both** `wrap_model_call`/`awrap_model_call` and
+    `wrap_tool_call`/`awrap_tool_call` (D3.1b).
+    """
+
+    _MAX_PAYLOAD_LENGTH = 2000  # Settings.max_span_payload_length's default;
+    # this class takes a plain int rather than a Settings object, since a
+    # middleware instance is built once at agent-construction time, before
+    # any per-run scoping exists -- callers that need the configured value
+    # pass it in.
+
+    def __init__(
+        self, *, role: str, max_payload_length: int = _MAX_PAYLOAD_LENGTH
+    ) -> None:
+        super().__init__()
+        self.role = role
+        self.max_payload_length = max_payload_length
+
+    def wrap_model_call(
+        self,
+        request: ModelRequest[ContextT],
+        handler: Callable[[ModelRequest[ContextT]], ModelResponse[ResponseT]],
+    ) -> ModelResponse[ResponseT]:
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span(f"model.{self.role}") as span:
+            response = handler(request)
+            self._record_usage(span, request, response)
+            return response
+
+    async def awrap_model_call(
+        self,
+        request: ModelRequest[ContextT],
+        handler: Callable[
+            [ModelRequest[ContextT]], Awaitable[ModelResponse[ResponseT]]
+        ],
+    ) -> ModelResponse[ResponseT]:
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span(f"model.{self.role}") as span:
+            response = await handler(request)
+            self._record_usage(span, request, response)
+            return response
+
+    def _record_usage(
+        self,
+        span: Any,
+        request: ModelRequest[ContextT],
+        response: ModelResponse[ResponseT],
+    ) -> None:
+        usage = next(
+            (
+                message.usage_metadata
+                for message in response.result
+                if isinstance(message, AIMessage) and message.usage_metadata
+            ),
+            None,
+        )
+        if usage is None:
+            return
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        span.set_attribute("gen_ai.usage.input_tokens", input_tokens)
+        span.set_attribute("gen_ai.usage.output_tokens", output_tokens)
+        model_name = getattr(request.model, "model_name", None)
+        if model_name is None:
+            return
+        cost = compute_cost(model_name, input_tokens, output_tokens)
+        if cost is not None:
+            span.set_attribute("gen_ai.usage.cost_usd", cost)
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command[Any]],
+    ) -> ToolMessage | Command[Any]:
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span(f"tool.{request.tool_call['name']}") as span:
+            self._record_args(span, request)
+            result = handler(request)
+            self._record_result(span, result)
+            return result
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]],
+    ) -> ToolMessage | Command[Any]:
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span(f"tool.{request.tool_call['name']}") as span:
+            self._record_args(span, request)
+            result = await handler(request)
+            self._record_result(span, result)
+            return result
+
+    def _record_args(self, span: Any, request: ToolCallRequest) -> None:
+        # A raw dict is silently dropped by OTel's own attribute validation
+        # (measured against the installed opentelemetry-sdk) -- always a
+        # JSON string, never the dict itself.
+        args_json = json.dumps(request.tool_call.get("args", {}), default=str)
+        span.set_attribute(
+            "tool.args", truncate_for_span(args_json, self.max_payload_length)
+        )
+
+    def _record_result(self, span: Any, result: ToolMessage | Command[Any]) -> None:
+        if isinstance(result, ToolMessage):
+            span.set_attribute(
+                "tool.result",
+                truncate_for_span(str(result.content), self.max_payload_length),
+            )
+
+
 def _tool_error_to_message(exc: Exception, request: ToolCallRequest) -> str:
     """Names the exception type rather than echoing its message, keeping
     internal detail out of the model's context, while preserving this
@@ -634,6 +772,7 @@ def _tool_error_to_message(exc: Exception, request: ToolCallRequest) -> str:
 def agent_middleware(
     *,
     tool_call_limit: int,
+    role: str,
     model_call_limit: int = _MODEL_CALL_LIMIT,
     tool_exit_behavior: Literal["continue", "error", "end"] = "continue",
 ) -> list[AgentMiddleware[Any, Any, Any]]:
@@ -643,6 +782,12 @@ def agent_middleware(
     ----------
     tool_call_limit : int
         Per-run tool-call budget, e.g. `settings.researcher_max_tool_calls`.
+    role : str
+        Passed straight through to `TracingMiddleware` for its span names
+        (`model.<role>`) -- required, no default (stage 5,
+        `docs/specs/stage-5.md` D5.10: a `TracingMiddleware` silently
+        mislabelled by a missing role is worse than a loud `TypeError` at
+        every one of this function's six real call sites).
     model_call_limit : int, default `_MODEL_CALL_LIMIT`
         Per-run model-call budget -- the only bound on a model that loops
         producing text without tool calls, which `ToolCallLimitMiddleware`
@@ -661,7 +806,10 @@ def agent_middleware(
     -------
     list of AgentMiddleware
         `ModelCallLimit -> ToolCallLimit -> ToolError -> ToolRetry ->
-        ModelRetry`, list order = outermost first. Callers append their own
+        ModelRetry -> Tracing`, list order = outermost first for the first
+        five (`TracingMiddleware` is appended last, innermost -- it wraps
+        the actual model/tool call, so it sees the real request/response,
+        not a limit-refused stand-in). Callers append their own
         agent-specific middleware (`ReadUrlCapMiddleware`,
         `CriticVerificationMiddleware`) after this list, since under D3.2
         agent factories no longer assemble any part of their own stack.
@@ -684,4 +832,5 @@ def agent_middleware(
         ToolErrorMiddleware(_tool_error_to_message),
         ToolRetryMiddleware(on_failure="error", jitter=True),
         ModelRetryMiddleware(),
+        TracingMiddleware(role=role),
     ]

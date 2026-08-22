@@ -73,6 +73,33 @@ def log_path(service: str, log_dir: str | Path = "logs") -> Path:
     return resolve(log_dir) / f"{service}.log"
 
 
+def run_dir(run_id: str, runs_dir: str | Path = "runs") -> Path:
+    """Directory for one run's artefacts, created if missing.
+
+    Parameters
+    ----------
+    run_id : str
+        Fresh per question/turn (stage 5, `docs/specs/stage-5.md` D5.7) --
+        not the REPL session's `thread_id`.
+    runs_dir : str or Path, default "runs"
+        Explicit so a test can redirect it under `tmp_path`, the same shape
+        `log_path`'s `log_dir` already uses.
+    """
+    result = resolve(runs_dir) / run_id
+    result.mkdir(parents=True, exist_ok=True)
+    return result
+
+
+def span_dump_path(run_id: str, runs_dir: str | Path = "runs") -> Path:
+    """Locate the offline span dump for one run.
+
+    See Also
+    --------
+    run_dir : Creates the parent directory this path lives in.
+    """
+    return run_dir(run_id, runs_dir) / "spans.json"
+
+
 def checkpoint_path(db: str | Path) -> Path:
     """Locate the checkpoint database, creating its parent directory if
     missing.

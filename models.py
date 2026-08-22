@@ -27,6 +27,40 @@ from config import Settings
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# model id -> (prompt $/token, completion $/token). Mirrors
+# docs/model-prices-2026-08-22.md exactly (docs/specs/stage-5.md, D5.2) --
+# that file is gitignored, so the literal is reproduced here rather than
+# merely cited. Lives in models.py, not observability.py: middleware.py
+# (infra) needs compute_cost for TracingMiddleware's per-model-call span
+# attributes, and infra may not import an obs-layer module
+# (tests/test_layering.py's MAY_IMPORT[INFRA] has no OBS entry) -- a gap
+# the stage-5 spec's own detailed design missed until implementation.
+# observability.py re-exports both names so `observability.PRICE_TABLE`/
+# `observability.compute_cost` still work for its own callers.
+PRICE_TABLE: dict[str, tuple[float, float]] = {
+    "openai/gpt-4.1-mini": (0.0000004, 0.0000016),
+    "google/gemini-2.5-pro": (0.00000125, 0.00001),
+    "openai/text-embedding-3-small": (0.00000002, 0.0),
+}
+
+
+def compute_cost(model: str, input_tokens: int, output_tokens: int) -> float | None:
+    """Cost in USD from token counts against `PRICE_TABLE`.
+
+    Returns
+    -------
+    float or None
+        `None` when `model` has no `PRICE_TABLE` entry -- never a partial
+        sum. A partial sum distorts more than an explicit "we don't know"
+        (the plan's own rule for this exact situation).
+    """
+    prices = PRICE_TABLE.get(model)
+    if prices is None:
+        return None
+    prompt_price, completion_price = prices
+    return input_tokens * prompt_price + output_tokens * completion_price
+
+
 # The roles whose caller builds a strict structured-output request:
 # "planner"/"critic" via ProviderStrategy(..., strict=True) (agents/planner.py,
 # agents/critic.py, stage 3) -- hardcoded rather than introspected from

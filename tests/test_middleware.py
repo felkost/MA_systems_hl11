@@ -148,7 +148,7 @@ def test_critic_verification_middleware_skips_retry_if_already_verified() -> Non
 
 
 def test_agent_middleware_stack_order_and_retry_on_failure() -> None:
-    stack = middleware.agent_middleware(tool_call_limit=5)
+    stack = middleware.agent_middleware(tool_call_limit=5, role="test")
     kinds = [type(m) for m in stack]
     assert kinds == [
         ModelCallLimitMiddleware,
@@ -156,15 +156,128 @@ def test_agent_middleware_stack_order_and_retry_on_failure() -> None:
         ToolErrorMiddleware,
         ToolRetryMiddleware,
         ModelRetryMiddleware,
+        middleware.TracingMiddleware,
     ]
     retry = next(m for m in stack if isinstance(m, ToolRetryMiddleware))
     assert retry.on_failure == "error"
 
 
 def test_agent_middleware_respects_the_tool_call_limit_argument() -> None:
-    stack = middleware.agent_middleware(tool_call_limit=7)
+    stack = middleware.agent_middleware(tool_call_limit=7, role="test")
     limiter = next(m for m in stack if isinstance(m, ToolCallLimitMiddleware))
     assert limiter.run_limit == 7
+
+
+def test_agent_middleware_appends_a_tracing_middleware_for_the_given_role() -> None:
+    stack = middleware.agent_middleware(tool_call_limit=5, role="researcher")
+    tracer = next(m for m in stack if isinstance(m, middleware.TracingMiddleware))
+    assert tracer.role == "researcher"
+
+
+# -- Stage 5, D5.10: TracingMiddleware -- model-call spans carry token usage
+# and cost; tool-call spans carry JSON-serialized args, never a raw dict
+# (OTel silently drops a dict-valued span attribute, measured against the
+# installed opentelemetry-sdk -- docs/specs/stage-5.md, D5.10 first
+# correction).
+
+
+def _recording_provider() -> tuple[Any, Any]:
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+        InMemorySpanExporter,
+    )
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    return provider, exporter
+
+
+def test_tracing_middleware_records_token_usage_and_cost_on_model_call() -> None:
+    from types import SimpleNamespace
+
+    from langchain_core.messages.ai import UsageMetadata
+    from opentelemetry import trace as otel_trace
+
+    provider, exporter = _recording_provider()
+    otel_trace.set_tracer_provider(provider)
+    try:
+        ai_message = AIMessage(
+            content="answer",
+            usage_metadata=UsageMetadata(
+                input_tokens=1000, output_tokens=500, total_tokens=1500
+            ),
+        )
+        # wrap_model_call reads the model name off `request.model` and never
+        # invokes it directly (the handler does) -- a bare stand-in with
+        # `model_name` is enough, matching how `ChatOpenAI.model_name`
+        # resolves in production (models.py, measured this session).
+        request = _model_request(
+            model=SimpleNamespace(model_name="openai/gpt-4.1-mini"),
+        )
+        handler = lambda r: ModelResponse(result=[ai_message])  # noqa: E731
+        middleware.TracingMiddleware(role="researcher").wrap_model_call(
+            request, handler
+        )
+        spans = exporter.get_finished_spans()
+        model_span = next(s for s in spans if s.name == "model.researcher")
+        assert model_span.attributes["gen_ai.usage.input_tokens"] == 1000
+        assert model_span.attributes["gen_ai.usage.output_tokens"] == 500
+        assert model_span.attributes["gen_ai.usage.cost_usd"] == pytest.approx(
+            1000 * 0.0000004 + 500 * 0.0000016
+        )
+    finally:
+        otel_trace._TRACER_PROVIDER = None
+        from opentelemetry.util._once import Once
+
+        otel_trace._TRACER_PROVIDER_SET_ONCE = Once()
+
+
+def test_tracing_middleware_serializes_tool_args_to_a_json_string_not_a_raw_dict() -> (
+    None
+):
+    from opentelemetry import trace as otel_trace
+
+    provider, exporter = _recording_provider()
+    otel_trace.set_tracer_provider(provider)
+    try:
+        request = _tool_call_request(name="web_search")
+        request.tool_call["args"] = {"query": "agent frameworks"}
+        middleware.TracingMiddleware(role="researcher").wrap_tool_call(
+            request, lambda r: ToolMessage("result", tool_call_id="c1")
+        )
+        spans = exporter.get_finished_spans()
+        tool_span = next(s for s in spans if s.name == "tool.web_search")
+        assert isinstance(tool_span.attributes["tool.args"], str)
+        assert "agent frameworks" in tool_span.attributes["tool.args"]
+    finally:
+        otel_trace._TRACER_PROVIDER = None
+        from opentelemetry.util._once import Once
+
+        otel_trace._TRACER_PROVIDER_SET_ONCE = Once()
+
+
+def test_tracing_middleware_defines_both_hook_variants() -> None:
+    for sync_name, async_name in [
+        ("wrap_model_call", "awrap_model_call"),
+        ("wrap_tool_call", "awrap_tool_call"),
+    ]:
+        sync_overridden = getattr(
+            middleware.TracingMiddleware, sync_name
+        ) is not getattr(AgentMiddleware, sync_name)
+        async_overridden = getattr(
+            middleware.TracingMiddleware, async_name
+        ) is not getattr(AgentMiddleware, async_name)
+        assert sync_overridden == async_overridden
+
+
+def test_truncate_for_span_marks_truncation_when_text_exceeds_max_length() -> None:
+    assert middleware.truncate_for_span("short", 100) == "short"
+    result = middleware.truncate_for_span("x" * 50, 10)
+    assert result.startswith("x" * 10)
+    assert "truncated" in result
+    assert len(result) < 50
 
 
 # -- Test 14: D3.7's renamed tool set, vacuous until stage 4 by design --
@@ -372,13 +485,15 @@ def test_verdict_guard_ignores_other_tools() -> None:
 
 
 def test_agent_middleware_default_exit_behavior_is_continue() -> None:
-    stack = middleware.agent_middleware(tool_call_limit=5)
+    stack = middleware.agent_middleware(tool_call_limit=5, role="test")
     limiter = next(m for m in stack if isinstance(m, ToolCallLimitMiddleware))
     assert limiter.exit_behavior == "continue"
 
 
 def test_agent_middleware_accepts_end_exit_behavior_for_the_supervisor() -> None:
-    stack = middleware.agent_middleware(tool_call_limit=5, tool_exit_behavior="end")
+    stack = middleware.agent_middleware(
+        tool_call_limit=5, tool_exit_behavior="end", role="supervisor"
+    )
     limiter = next(m for m in stack if isinstance(m, ToolCallLimitMiddleware))
     assert limiter.exit_behavior == "end"
 

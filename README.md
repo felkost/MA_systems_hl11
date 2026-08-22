@@ -8,16 +8,18 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 3 of 10 (domain: schemas, prompts, agents, middleware)
-> complete.** The RAG foundation from stage 2 — config, retrieval, ingest,
-> tools with their guardrails — is built, and `python ingest.py` has run for
-> real against the 12-PDF corpus in `data/`. The three sub-agents (Planner,
-> Researcher, Critic) now build and run individually against a scripted
-> model, each bound only to its own allowlisted tools, with an explicit
-> refusal for a request outside this system's research-assistant purpose.
-> **There is no Supervisor and no REPL yet** — coordinating the three agents
-> into one run is stage 4. Sections marked *(planned)* below describe what
-> is coming, not what runs today.
+> **Status: stage 5 of 10 (observability) complete.** The RAG foundation
+> (stage 2), the three sub-agents (stage 3), and both coordination paths —
+> the agent-as-tool Supervisor and the explicit `StateGraph` — with the
+> REPL that drives either one (stage 4) are all built and run for real.
+> `python main.py` reaches a human-in-the-loop gate before it ever writes a
+> report. This stage adds a single OpenTelemetry `TracerProvider` per
+> process, an offline `runs/<run_id>/spans.json` dump the evaluation
+> pipeline reads with no external service, optional Langfuse Cloud tracing
+> (`TRACING_ENABLED=true`), rotated file logs, and cost/latency computed
+> from token counts. **The golden dataset and the DeepEval test suite do
+> not exist yet** — that is stages 6 to 9. Sections marked *(planned)*
+> below describe what is coming, not what runs today.
 
 ## Architecture
 
@@ -34,8 +36,8 @@ Two interchangeable coordination paths express the same loop, so that the
 revision cap is enforced by two independent mechanisms:
 
 ```
-python main.py                          # agent-as-tool Supervisor  (planned)
-python main.py --orchestration graph    # explicit StateGraph        (planned)
+python main.py                          # agent-as-tool Supervisor
+python main.py --orchestration graph    # explicit StateGraph
 ```
 
 Retrieval is **ChromaDB only** — dense vectors plus BM25 over the same chunk
@@ -63,8 +65,8 @@ tests that cannot run.**
 ## Run
 
 ```bash
-python ingest.py     # build the Chroma index from data/ -- works today
-python main.py       # the REPL -- planned, stage 4 onward
+python ingest.py     # build the Chroma index from data/
+python main.py       # the REPL
 ```
 
 Reports are written to `output/` and only after you approve them: the single
