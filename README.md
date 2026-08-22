@@ -8,18 +8,20 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 7 of 10 (component tests) complete.** The RAG foundation
+> **Status: stage 8 of 10 (tool correctness) complete.** The RAG foundation
 > (stage 2), the three sub-agents (stage 3), both coordination paths —
 > the agent-as-tool Supervisor and the explicit `StateGraph` — with the
 > REPL that drives either one (stage 4), observability (stage 5,
-> OpenTelemetry + optional Langfuse Cloud + offline span dumps), and the
-> 15-case golden dataset (stage 6) are all built and run for real.
-> `python main.py` reaches a human-in-the-loop gate before it ever writes a
-> report. This stage adds the first three **DeepEval** metrics — Plan
-> Quality, Critique Quality and Groundedness — measured against real live
-> agent runs, with their first baseline recorded below. **Tool-correctness
-> tests and the end-to-end evaluation do not exist yet** — those are
-> stages 8 and 9. Sections marked *(planned)* below describe what is
+> OpenTelemetry + optional Langfuse Cloud + offline span dumps), the
+> 15-case golden dataset (stage 6) and the three component metrics
+> (stage 7) are all built and run for real. `python main.py` reaches a
+> human-in-the-loop gate before it ever writes a report. This stage adds
+> **tool-correctness tests**: three live cases checking that the Planner
+> reaches for search, that the Researcher uses the tools its own plan
+> named, and that an approved run really does call `save_report` — each
+> scored from the run's own span dump rather than from a mock. **The
+> end-to-end evaluation over the full golden dataset does not exist yet** —
+> that is stage 9. Sections marked *(planned)* below describe what is
 > coming, not what runs today.
 
 ## Architecture
@@ -102,7 +104,7 @@ to ignore a red CI, and a CI nobody trusts stops catching real breakage.
 | Plan Quality | GEval | Planner | **built** (stage 7) |
 | Critique Quality | GEval | Critic | **built** (stage 7) |
 | Groundedness | GEval, over retrieval context | Researcher | **built** (stage 7) |
-| Tool Correctness | deterministic | Planner, Researcher, Supervisor | *planned (stage 8)* |
+| Tool Correctness | deterministic | Planner, Researcher, Supervisor | **built** (stage 8) |
 | Answer Relevancy | built-in | whole system | *planned (stage 9)* |
 | Correctness | GEval, against expected output | whole system | *planned (stage 9)* |
 | Citation Presence | **custom GEval** | whole system | *planned (stage 9)* |
@@ -131,6 +133,38 @@ context is built from `knowledge_search` results only — nothing captures
 what `web_search` and `read_url` return in a form the metric can see — so a
 correct, web-sourced claim is counted ungrounded by construction. That
 number is a starting baseline with a named cause, not a threshold to lower.
+
+### Tool correctness — stage 8
+
+One run each, against the real system. Unlike the metrics above, this one is
+**deterministic**: no model judges it, so these results carry no judge
+variance — only whatever variance the agents themselves have.
+
+| Test | Scenario | Expected tools | Result |
+|---|---|---|---|
+| `test_planner_tools` | Planner given a research question | `web_search` and/or `knowledge_search` | pass |
+| `test_researcher_tools` | Researcher given a plan | whatever that plan's own `sources_to_check` named | pass |
+| `test_supervisor_save` | Supervisor after an `APPROVE` | `critique` then `save_report`, in that order | pass |
+
+**3 of 3 passed.** Two things about the third case are worth stating, since
+both were found by running it rather than by reasoning about it:
+
+- The real run took **two revision rounds** before the Critic approved, and
+  the Supervisor's first `save_report` attempt was **refused** by the
+  verdict guard. The test does not merely check that `save_report` ran — it
+  separately confirms from the run's message history that the Critic
+  actually returned `APPROVE`, because the revision-budget escape valve can
+  otherwise let a save through without one.
+- A `tool.save_report` span exists for the refused attempt too. Tracing sits
+  outside the guards, so a span means "the call was made", not "the file was
+  written".
+
+The threshold here is **0.5**, the value the assignment specifies. For the
+Planner case it is load-bearing rather than a tuning knob: the score is the
+matched fraction of the expected tools, so 0.5 against a two-tool
+expectation is exactly "either of these". Unlike the judged metrics, this
+threshold is not a baseline to raise later — raising it would silently turn
+an "or" into an "and".
 
 ### How to read the numbers
 
