@@ -246,6 +246,29 @@ def tools_called_for_agent(
     return calls
 
 
+def total_agent_cost(run: RunSpans) -> float:
+    """Sum `gen_ai.usage.cost_usd` across every span in one run.
+
+    Stage 9a's own measured-cost obligation (`docs/specs/stage-9a.md` D9a.8):
+    the same attribute stage 7/8 already read by hand when reporting cost,
+    made reusable. A span with no such attribute (a tool span, not a model
+    call) contributes `0.0`, never an error -- only a subset of spans ever
+    carry it.
+
+    Parameters
+    ----------
+    run : RunSpans
+
+    Returns
+    -------
+    float
+    """
+    return sum(
+        span.get("attributes", {}).get("gen_ai.usage.cost_usd", 0.0) or 0.0
+        for span in run.spans
+    )
+
+
 def build_llm_test_case(
     run: RunSpans,
     *,
