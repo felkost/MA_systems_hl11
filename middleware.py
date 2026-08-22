@@ -42,6 +42,7 @@ wired.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Awaitable, Callable
 from typing import Any, Literal, cast
 
@@ -627,6 +628,9 @@ class SaveReportVerdictGuardMiddleware(
         )
 
 
+_TRUNCATION_MARKER = re.compile(r"\.\.\.\[truncated, \d+ chars total\]\Z")
+
+
 def truncate_for_span(text: str, max_length: int) -> str:
     """Cap `text` at `max_length`, marking that it was cut.
 
@@ -639,6 +643,21 @@ def truncate_for_span(text: str, max_length: int) -> str:
     if len(text) <= max_length:
         return text
     return f"{text[:max_length]}...[truncated, {len(text)} chars total]"
+
+
+def was_truncated_for_span(text: str) -> bool:
+    """Did `truncate_for_span` cut this value?
+
+    A reader of a span attribute needs to tell "this payload was cut, so
+    it will not parse" apart from "this payload is corrupt". Both look
+    identical to a JSON parser, and only the first is normal: a Supervisor
+    delegation argument routinely runs past the payload cap, so
+    `tool.args` is frequently valid JSON that has had its tail removed.
+    The predicate lives next to the function that writes the marker, so the
+    two cannot drift apart -- pinned by
+    `tests/test_middleware_truncation_marker.py`.
+    """
+    return _TRUNCATION_MARKER.search(text) is not None
 
 
 class TracingMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, ResponseT]):

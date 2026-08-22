@@ -49,11 +49,19 @@ AGENT_SPAN_NAME: dict[str, str] = {
 
 @dataclass(frozen=True)
 class LiveRun:
-    """One live sub-agent invocation's rendered output and full span dump."""
+    """One live sub-agent invocation's rendered output and full span dump.
+
+    `plan` is set only for the planner role. A caller that needs the plan's
+    own fields -- stage 8's R3b derives its expected tool set from
+    `sources_to_check` -- would otherwise have to parse them back out of the
+    markdown `render_plan` produced, which would make a rendering change
+    silently break an unrelated test.
+    """
 
     run_id: str
     output: str
     spans: RunSpans
+    plan: ResearchPlan | None = None
 
 
 @contextmanager
@@ -105,6 +113,7 @@ def run_agent_live(role: str, agent_input: str, *, settings: Settings) -> LiveRu
     """
     model = build_chat_model(settings, role)
     run_id = str(uuid4())
+    plan: ResearchPlan | None = None
     token = context.attach(baggage.set_baggage("run_id", run_id))
     try:
         with trace.get_tracer(__name__).start_as_current_span(
@@ -123,6 +132,7 @@ def run_agent_live(role: str, agent_input: str, *, settings: Settings) -> LiveRu
                 result = graph.invoke({"messages": [HumanMessage(content=agent_input)]})
                 plan = cast(ResearchPlan, result["structured_response"])
                 output = render_plan(plan)
+
             elif role == "researcher":
                 graph = create_research_agent(
                     settings,
@@ -162,4 +172,4 @@ def run_agent_live(role: str, agent_input: str, *, settings: Settings) -> LiveRu
         context.detach(token)
 
     spans = load_run(run_id, runs_dir=settings.span_dump_dir or "runs")
-    return LiveRun(run_id=run_id, output=output, spans=spans)
+    return LiveRun(run_id=run_id, output=output, spans=spans, plan=plan)
