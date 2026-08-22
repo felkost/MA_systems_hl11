@@ -77,10 +77,25 @@ MAY_IMPORT: dict[str, frozenset[str]] = {
     OBS: frozenset({KERNEL, DOMAIN, INFRA, OBS}),
 }
 
-# Pairs that must never import each other in either direction, regardless of
-# what the layer rules alone would permit.
-FORBIDDEN_PAIRS: tuple[tuple[str, str], ...] = (
+# Pairs that must never import each other in **either** direction, regardless
+# of what the layer rules alone would permit: the two coordination paths are
+# meant to be independent implementations of the same contract, so an import
+# between them would let a change to one silently change the other.
+BIDIRECTIONAL_FORBIDDEN_PAIRS: tuple[tuple[str, str], ...] = (
     ("supervisor", "orchestrator"),
+)
+
+# Pairs forbidden in **one** direction only: a sub-agent must never import a
+# coordinator (CLAUDE.md, Invariants -- "agents/* must never import
+# supervisor or orchestrator"), which would invert the dependency arrow the
+# whole agent-as-tool/StateGraph design rests on. The reverse import is not
+# just permitted but required -- stage 4 audit finding, D4.22
+# (docs/specs/stage-4.md): the first version of this test (stage 0, written
+# before either coordinator existed) checked both directions for these pairs
+# too, which would have forbidden supervisor.py/orchestrator.py from ever
+# calling `create_planner_agent`/`create_research_agent`/`create_critic_agent`
+# -- the only functions that build a compiled sub-agent graph at all.
+DIRECTIONAL_FORBIDDEN_PAIRS: tuple[tuple[str, str], ...] = (
     ("agents.planner", "supervisor"),
     ("agents.planner", "orchestrator"),
     ("agents.research", "supervisor"),
@@ -163,9 +178,12 @@ def test_module_imports_respect_its_layer(path: Path) -> None:
     assert not violations, "; ".join(violations)
 
 
-@pytest.mark.parametrize("left,right", FORBIDDEN_PAIRS, ids=lambda v: v)
-def test_forbidden_pairs_never_import_each_other(left: str, right: str) -> None:
-    """The two coordination paths, and the sub-agents, stay independent.
+@pytest.mark.parametrize("left,right", BIDIRECTIONAL_FORBIDDEN_PAIRS, ids=lambda v: v)
+def test_bidirectional_forbidden_pairs_never_import_each_other(
+    left: str, right: str
+) -> None:
+    """The two coordination paths stay independent implementations of the
+    same contract, in both directions.
 
     Passing vacuously while neither module exists is intended: the rule is
     written before the code so that the first version of that code is already
@@ -179,3 +197,31 @@ def test_forbidden_pairs_never_import_each_other(left: str, right: str) -> None:
             f"{importer} imports {forbidden}; they must stay independent "
             "(see CLAUDE.md, Invariants)"
         )
+
+
+@pytest.mark.parametrize(
+    "sub_agent,coordinator", DIRECTIONAL_FORBIDDEN_PAIRS, ids=lambda v: v
+)
+def test_sub_agents_never_import_a_coordinator(
+    sub_agent: str, coordinator: str
+) -> None:
+    """A sub-agent must never import `supervisor`/`orchestrator` (CLAUDE.md,
+    Invariants) -- the reverse import is not checked here because it is
+    required: a coordinator's only way to obtain a compiled sub-agent graph
+    is `create_planner_agent`/`create_research_agent`/`create_critic_agent`,
+    all defined in `agents.*` (D4.22, `docs/specs/stage-4.md` -- stage 0's
+    original bidirectional check would have forbidden the architecture it
+    was meant to protect).
+
+    Passing vacuously while `sub_agent`'s module exists but reads nothing
+    from `coordinator` is the normal case at every stage; it stays
+    meaningful once `supervisor.py`/`orchestrator.py` exist because an
+    accidental upward import would now be a real, checkable violation.
+    """
+    path = PROJECT_ROOT / f"{sub_agent.replace('.', '/')}.py"
+    if not path.exists():
+        return
+    assert coordinator not in _imported_project_modules(path), (
+        f"{sub_agent} imports {coordinator}; a sub-agent must never import a "
+        "coordinator (see CLAUDE.md, Invariants)"
+    )
