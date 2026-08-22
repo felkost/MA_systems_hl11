@@ -116,8 +116,12 @@ class Settings(BaseSettings):
     embedding_model: str = "openai/text-embedding-3-small"
     embedding_dimensions: int | None = Field(default=None, ge=64, le=3072)
 
-    # -- HITL checkpoint (stage 4): the Supervisor's own checkpointer, never
-    # a sub-agent's (CLAUDE.md invariant).
+    # -- HITL checkpoint: unused. Stage 4 runs `MemorySaver` on the
+    # Supervisor and on the compiled orchestrator graph -- never a
+    # sub-agent's (CLAUDE.md invariant) -- because
+    # `langgraph-checkpoint-sqlite` is not a dependency and an in-process
+    # REPL session needs no cross-process durability. The field and
+    # `paths.checkpoint_path` wait for a stage that adds the backend.
     checkpoint_db: str = "runtime/checkpoints.sqlite"
 
     # -- Observability (stage 5), Langfuse Cloud only -- no docker-compose.yml

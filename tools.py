@@ -372,10 +372,12 @@ def save_report(filename: str, content: str) -> str:
         output_dir = paths.resolve(settings.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Prefixed with the save time (to the minute) so two reports the
-        # model names the same way, in different runs, still get distinct
-        # paths -- resolve_report_path's must_not_exist=True is the actual
-        # guarantee, this just makes the common case not need it.
+        # A report's name must begin with when it was saved: the output
+        # directory is read chronologically by a human, and the model names
+        # reports by topic, which sorts by nothing useful. The prefix also
+        # keeps same-named reports from different runs apart --
+        # resolve_report_path's must_not_exist=True remains the guarantee
+        # for the same-minute case. Pinned by test_tools_save_report.py.
         timestamp = datetime.now().strftime("%Y%m%d-%H%M")
         report_path = resolve_report_path(
             f"{timestamp}-{safe_stem}.md", output_dir, must_not_exist=True
