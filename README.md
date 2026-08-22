@@ -8,12 +8,16 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 2 of 10 (kernel + infra) complete.** The RAG foundation —
-> config, retrieval, ingest, tools with their guardrails — is built, and
-> `python ingest.py` has run for real against the 12-PDF corpus in `data/`.
-> **The agents themselves have not been written yet** — that is stage 3
-> onward. Sections marked *(planned)* below describe what is coming, not
-> what runs today.
+> **Status: stage 3 of 10 (domain: schemas, prompts, agents, middleware)
+> complete.** The RAG foundation from stage 2 — config, retrieval, ingest,
+> tools with their guardrails — is built, and `python ingest.py` has run for
+> real against the 12-PDF corpus in `data/`. The three sub-agents (Planner,
+> Researcher, Critic) now build and run individually against a scripted
+> model, each bound only to its own allowlisted tools, with an explicit
+> refusal for a request outside this system's research-assistant purpose.
+> **There is no Supervisor and no REPL yet** — coordinating the three agents
+> into one run is stage 4. Sections marked *(planned)* below describe what
+> is coming, not what runs today.
 
 ## Architecture
 

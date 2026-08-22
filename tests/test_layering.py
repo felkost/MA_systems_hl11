@@ -46,6 +46,7 @@ LAYER_OF_MODULE: dict[str, str] = {
     "agents.planner": DOMAIN,
     "agents.research": DOMAIN,
     "agents.critic": DOMAIN,
+    "agents._allowlist": DOMAIN,
     "schemas": DOMAIN,
     "prompts": DOMAIN,
     "tools": INFRA,

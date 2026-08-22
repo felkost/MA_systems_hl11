@@ -67,6 +67,15 @@ class Settings(BaseSettings):
     judge_model_name: str | None = None
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
 
+    # -- Prompt versions (prompts.py, stage 3). `critic_prompt_version`
+    # defaults to "c2", the coupled verdict/booleans version -- matching
+    # hl8's own default and what docs/task-hl11.md's Critique Quality GEval
+    # measures against (docs/specs/stage-3.md, D3.4).
+    planner_prompt_version: str = "p1"
+    researcher_prompt_version: str = "r1"
+    critic_prompt_version: str = "c2"
+    supervisor_prompt_version: str = "s1"
+
     # -- Supervisor / revision loop
     max_revisions: int = Field(default=2, ge=1, le=3)
     recursion_limit: int = Field(default=100, ge=2, le=200)
