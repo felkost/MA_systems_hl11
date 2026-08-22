@@ -14,7 +14,11 @@ DeepEval never accrues cost for a custom (non-native) model --
 `initialize_model` in the installed package marks any `DeepEvalBaseLLM`
 subclass `using_native_model=False`, and DeepEval's own cost tracking only
 fires on the native branch. This wrapper therefore records usage on every
-call itself, in `self.last_usage`, rather than assuming DeepEval will.
+call itself, in `self.last_usage`, rather than assuming DeepEval will. An
+optional `usage_log` (stage 9a, `docs/specs/stage-9a.md` D9a.7) accumulates
+every call's usage instead of overwriting it, for a caller that needs a
+metric's real total cost when one `.measure()` makes more than one model
+call internally.
 """
 
 from __future__ import annotations
@@ -51,6 +55,7 @@ class OpenRouterModel(DeepEvalBaseLLM):
         # is what lets one test double satisfy both httpx.Client and
         # httpx.AsyncClient below.
         transport: httpx.BaseTransport | httpx.AsyncBaseTransport | None = None,
+        usage_log: list[dict[str, int]] | None = None,
     ) -> None:
         # `transport` is a constructor seam for tests -- passing a
         # `httpx.MockTransport` here is how the offline suite exercises this
@@ -65,6 +70,16 @@ class OpenRouterModel(DeepEvalBaseLLM):
             transport
         )
         self.last_usage: dict[str, int] | None = None
+        # `usage_log`, unlike `last_usage`, is never overwritten -- every
+        # call appends. `last_usage` alone cannot report a metric's real
+        # cost when one `.measure()` makes more than one model call
+        # (`AnswerRelevancyMetric` makes three, stage 9a's own SDK
+        # measurement, `docs/specs/stage-9a.md` N2): reading `last_usage`
+        # after the fact only ever sees the last of them. A caller that
+        # passes a shared list here (stage 9a's `e2e_judge_model` fixture)
+        # gets every call's usage, in order, regardless of how many calls
+        # one metric measurement made internally.
+        self.usage_log: list[dict[str, int]] | None = usage_log
         super().__init__(model=model_name)
 
     def load_model(self) -> "OpenRouterModel":
@@ -106,6 +121,8 @@ class OpenRouterModel(DeepEvalBaseLLM):
             "completion_tokens": usage.get("completion_tokens", 0),
             "total_tokens": usage.get("total_tokens", 0),
         }
+        if self.usage_log is not None:
+            self.usage_log.append(dict(self.last_usage))
 
     def _extract_content(self, body: dict[str, Any]) -> str:
         return body["choices"][0]["message"]["content"]
