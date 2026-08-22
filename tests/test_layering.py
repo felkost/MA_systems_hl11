@@ -60,13 +60,20 @@ LAYER_OF_MODULE: dict[str, str] = {
     "evals.runner": OBS,
 }
 
+#  Stage 2 finding: a layer must be allowed to import itself. The table in
+# CLAUDE.md ("May import") never says a layer may reach its own -- an
+# omission nobody could see at stage 0, when this dict was written and no
+# code existed yet. The first real modules (config.py -> paths.py, both
+# kernel; retriever.py -> models.py, both infra; tools.py -> retriever.py,
+# both infra) all need a same-layer import, so each set below now includes
+# its own layer explicitly.
 MAY_IMPORT: dict[str, frozenset[str]] = {
-    KERNEL: frozenset(),
-    DOMAIN: frozenset({KERNEL}),
-    INFRA: frozenset({KERNEL, DOMAIN}),
-    APPLICATION: frozenset({KERNEL, DOMAIN, INFRA}),
-    INTERFACE: frozenset({KERNEL, DOMAIN, INFRA, APPLICATION, OBS}),
-    OBS: frozenset({KERNEL, DOMAIN, INFRA}),
+    KERNEL: frozenset({KERNEL}),
+    DOMAIN: frozenset({KERNEL, DOMAIN}),
+    INFRA: frozenset({KERNEL, DOMAIN, INFRA}),
+    APPLICATION: frozenset({KERNEL, DOMAIN, INFRA, APPLICATION}),
+    INTERFACE: frozenset({KERNEL, DOMAIN, INFRA, APPLICATION, INTERFACE, OBS}),
+    OBS: frozenset({KERNEL, DOMAIN, INFRA, OBS}),
 }
 
 # Pairs that must never import each other in either direction, regardless of

@@ -8,11 +8,12 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 1 of 10 (SDK reconnaissance) complete.** The DeepEval
-> integration wrapper (`evals/deepeval_model.py`) is built and verified live
-> against OpenRouter. **The agent system itself has not been written yet** —
-> that is stages 2 onward. Sections marked *(planned)* below describe what is
-> coming, not what runs today.
+> **Status: stage 2 of 10 (kernel + infra) complete.** The RAG foundation —
+> config, retrieval, ingest, tools with their guardrails — is built, and
+> `python ingest.py` has run for real against the 12-PDF corpus in `data/`.
+> **The agents themselves have not been written yet** — that is stage 3
+> onward. Sections marked *(planned)* below describe what is coming, not
+> what runs today.
 
 ## Architecture
 
@@ -37,8 +38,8 @@ Retrieval is **ChromaDB only** — dense vectors plus BM25 over the same chunk
 dump, with a cross-encoder rerank. There is no graph database, no MCP server
 and no A2A server in this project, and no `docker-compose.yml`.
 
-Every model runs through **OpenRouter**. Embeddings run locally, because
-OpenRouter exposes no embeddings endpoint.
+Every model runs through **OpenRouter**, embeddings included
+(`openai/text-embedding-3-small` via OpenRouter's `/api/v1/embeddings`).
 
 ## Install
 
@@ -55,11 +56,11 @@ other setting, including which ones are optional.
 tool, not a runtime dependency. **Installing only `requirements.txt` gives you
 tests that cannot run.**
 
-## Run *(planned — stage 2 onwards)*
+## Run
 
 ```bash
-python ingest.py     # build the Chroma index from data/
-python main.py       # the REPL
+python ingest.py     # build the Chroma index from data/ -- works today
+python main.py       # the REPL -- planned, stage 4 onward
 ```
 
 Reports are written to `output/` and only after you approve them: the single
