@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     planner_prompt_version: str = "p1"
     researcher_prompt_version: str = "r2"
     critic_prompt_version: str = "c2"
-    supervisor_prompt_version: str = "s1"
+    supervisor_prompt_version: str = "s2"
     composer_prompt_version: str = "w1"
 
     # -- Supervisor / revision loop
