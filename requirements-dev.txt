@@ -24,3 +24,17 @@ pytest-asyncio==1.4.0
 # stage-1 SDK reconnaissance measures this specific version's API surface,
 # and a floor would let a later resolve move underneath those findings.
 deepeval==4.1.10
+
+# DeepEval's own result cache takes a shared file lock, and on Windows
+# `portalocker` (which deepeval already pulls in) cannot take one without
+# pywin32 -- `msvcrt` provides no true shared lock. Without this extra,
+# `get_cached_test_run` returns None and deepeval's own
+# `cache.py:cache_test_case` raises `AttributeError: 'NoneType' object has
+# no attribute 'test_cases_lookup_map'` on EVERY test case, whatever its
+# metrics scored. Measured at stage 9e phase 1b: all 14 e2e cases failed
+# that way while DeepEval's own persisted run file recorded 7 of them as
+# passing. Worse than cosmetic -- an `AttributeError` is not an
+# `AssertionError`, so it escapes `tests/test_e2e.py`'s own combined-error
+# handler and silently suppresses the deterministic `check_expects`
+# failures that handler exists to report.
+portalocker[win32]>=3.0

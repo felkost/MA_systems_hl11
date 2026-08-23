@@ -16,14 +16,14 @@ unmodified, `supervisor.py`'s `_make_plan_tool`).
 from __future__ import annotations
 
 import pytest
-from deepeval.evaluate import assert_test
 from deepeval.metrics import GEval
 from deepeval.metrics.base_metric import BaseMetric
 from deepeval.models.base_model import DeepEvalBaseLLM
 from deepeval.test_case import LLMTestCase, SingleTurnParams
 
 from config import Settings
-from tests.conftest import golden_input, judge_model, skip_without_index
+from evals.deepeval_model import OpenRouterModel
+from tests.conftest import golden_input, run_judged_case, skip_without_index
 from tests.live_agents import run_agent_live
 
 pytestmark = pytest.mark.eval
@@ -43,7 +43,14 @@ def _plan_quality_metric(model: DeepEvalBaseLLM) -> GEval:
     )
 
 
-def _run_case(case_id: str, live_settings: Settings, *, test_name: str) -> None:
+def _run_case(
+    case_id: str,
+    live_settings: Settings,
+    *,
+    test_name: str,
+    eval_run_id: str,
+    component_judge_model: OpenRouterModel,
+) -> None:
     skip_without_index()
     agent_input = golden_input(case_id)
     live = run_agent_live("planner", agent_input, settings=live_settings)
@@ -54,19 +61,48 @@ def _run_case(case_id: str, live_settings: Settings, *, test_name: str) -> None:
         name=f"{test_name}[{case_id}]", input=agent_input, actual_output=live.output
     )
     assert case.actual_output, f"{case_id}: planner produced no output"
-    metrics: list[BaseMetric] = [_plan_quality_metric(judge_model(live_settings))]
-    assert_test(case, metrics)
+    metrics: list[BaseMetric] = [_plan_quality_metric(component_judge_model)]
+    run_judged_case(
+        eval_run_id,
+        case_id=f"{test_name}[{case_id}]",
+        test_case=case,
+        metrics=metrics,
+        judge=component_judge_model,
+        spans=live.spans,
+    )
 
 
 @pytest.mark.parametrize(
     "case_id", ["core-single-vs-multi-agent", "core-agent-persona"]
 )
-def test_plan_quality(case_id: str, live_settings: Settings) -> None:
-    _run_case(case_id, live_settings, test_name="test_plan_quality")
+def test_plan_quality(
+    case_id: str,
+    live_settings: Settings,
+    eval_run_id: str,
+    component_judge_model: OpenRouterModel,
+) -> None:
+    _run_case(
+        case_id,
+        live_settings,
+        test_name="test_plan_quality",
+        eval_run_id=eval_run_id,
+        component_judge_model=component_judge_model,
+    )
 
 
 @pytest.mark.parametrize(
     "case_id", ["core-tool-calling-role", "core-agent-vs-rag-boundary"]
 )
-def test_plan_has_queries(case_id: str, live_settings: Settings) -> None:
-    _run_case(case_id, live_settings, test_name="test_plan_has_queries")
+def test_plan_has_queries(
+    case_id: str,
+    live_settings: Settings,
+    eval_run_id: str,
+    component_judge_model: OpenRouterModel,
+) -> None:
+    _run_case(
+        case_id,
+        live_settings,
+        test_name="test_plan_has_queries",
+        eval_run_id=eval_run_id,
+        component_judge_model=component_judge_model,
+    )

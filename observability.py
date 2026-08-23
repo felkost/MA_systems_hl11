@@ -54,7 +54,11 @@ from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 
 import paths
 from config import Settings
-from models import PRICE_TABLE, compute_cost  # noqa: F401 -- re-exported
+from models import (  # noqa: F401 -- re-exported
+    PRICE_TABLE,
+    compute_cost,
+    compute_cost_or_raise,
+)
 
 _MAX_QUEUE_LENGTH = 10_000  # generous headroom for one run's own spans
 

@@ -22,10 +22,15 @@ from typing import Any, Iterator
 from uuid import uuid4
 
 import pytest
+from deepeval.evaluate import assert_test
+from deepeval.metrics.base_metric import BaseMetric
+from deepeval.test_case import LLMTestCase
 
+import models
 import paths
-from config import Settings, load_settings
+from config import Settings, export_deepeval_timeout_override, load_settings
 from evals.deepeval_model import OpenRouterModel
+from evals.runner import RunSpans, total_agent_cost
 from paths import PROJECT_ROOT
 from tests.fixture_server import run_fixture_server
 from tests.live_agents import configured_for_eval, eval_settings
@@ -45,6 +50,12 @@ def live_settings(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Settings
         runs_dir=str(tmp_path_factory.mktemp("eval-runs")),
         settings=load_settings(),
     )
+    # D9e.1: the binding knob for a judge-metric timeout is DeepEval's own
+    # per-task budget, not the httpx read timeout `OpenRouterModel` already
+    # carries. Exported once per session, after `load_settings()` has
+    # already succeeded (this field has no code default that would let it
+    # run at import time the way `_export_cache_env` does).
+    export_deepeval_timeout_override(settings)
     with configured_for_eval(settings):
         yield settings
 
@@ -100,15 +111,6 @@ def resolve_case_input(case: dict[str, Any], fixture_base_url: str) -> str:
     return str(case["input"]).format(fixture_url=f"{fixture_base_url}/{fixture_name}")
 
 
-def judge_model(settings: Settings) -> OpenRouterModel:
-    """The judge model, resolved the same way every eval-tier metric does:
-    `Settings.judge_model_name` if set, else the shared agent model."""
-    return OpenRouterModel(
-        settings.judge_model_name or settings.model_name,
-        api_key=settings.openrouter_api_key.get_secret_value(),
-    )
-
-
 def skip_without_index() -> None:
     """Skip an eval-tier test that needs a live index this CI job never
     builds (`index/` is gitignored, the `evals` job runs no `ingest.py`
@@ -146,20 +148,91 @@ def eval_run_id() -> str:
     return str(uuid4())
 
 
+def _shared_judge_model(live_settings: Settings) -> OpenRouterModel:
+    return OpenRouterModel(
+        live_settings.judge_model_name or live_settings.model_name,
+        api_key=live_settings.openrouter_api_key.get_secret_value(),
+        usage_log=[],
+        reasoning_effort=live_settings.judge_reasoning_effort,
+    )
+
+
 @pytest.fixture(scope="session")
 def e2e_judge_model(live_settings: Settings) -> OpenRouterModel:
     """One judge model instance, shared across all 15 golden-dataset cases'
     3 metrics, with a real `usage_log` (stage 9a, D9a.7) -- sharing one
     instance is what lets the log accumulate a real total; a fresh instance
-    per call (`judge_model()`, above, kept for stages 7/8's own per-test-body
-    reads) would reset nothing on `usage_log` itself, but `test_e2e.py`
+    per call would reset nothing on `usage_log` itself, but `test_e2e.py`
     needs the *same* list back after 45 measurements, not 45 separate ones.
     """
-    return OpenRouterModel(
-        live_settings.judge_model_name or live_settings.model_name,
-        api_key=live_settings.openrouter_api_key.get_secret_value(),
-        usage_log=[],
-    )
+    return _shared_judge_model(live_settings)
+
+
+@pytest.fixture(scope="session")
+def component_judge_model(live_settings: Settings) -> OpenRouterModel:
+    """One judge model instance shared across the four component test
+    files' own live cases (stage 9e -- the "shared judge instance" phase-1
+    deliverable, extended past `test_e2e.py`'s own D9a.7 fixture).
+
+    Component-file judge cost had never been measured before this stage
+    (`insights.md`, stage 9e planning: "the component cases' judge cost has
+    never been measured") -- each test body built a fresh, unlogged judge
+    model instead. Separate from `e2e_judge_model` because the two never
+    run in the same process (D9e.12's two-invocation configuration keeps
+    `tests/test_e2e.py` and the four component files in separate `deepeval
+    test run` invocations), not because sharing one instance across both
+    would be wrong.
+    """
+    return _shared_judge_model(live_settings)
+
+
+def run_judged_case(
+    eval_run_id: str,
+    *,
+    case_id: str,
+    test_case: LLMTestCase,
+    metrics: list[BaseMetric],
+    judge: OpenRouterModel,
+    spans: RunSpans,
+) -> None:
+    """Run `assert_test`, then persist this case's span dump and its
+    measured agent/judge cost, whatever `assert_test` did (stage 9e).
+
+    Shared by the four component test files. `tests/test_e2e.py` keeps its
+    own richer version -- it also combines a deterministic pre-check's
+    failure into the raised error (D9e.3), which no component-file case
+    has an equivalent of.
+
+    Raises
+    ------
+    Exception
+        Whatever `assert_test` itself raised, re-raised after the `finally`
+        block below has already run -- cost and span persistence must not
+        depend on the case having passed, and must survive a DeepEval-internal
+        crash as well as an ordinary metric failure (stage 9e phase 1b: a
+        missing pywin32 made every case die on `AttributeError` from
+        DeepEval's own result cache).
+    """
+    judge_calls_before = len(judge.usage_log or [])
+    try:
+        assert_test(test_case, metrics)
+    finally:
+        judge_cost = sum(
+            models.compute_cost_or_raise(
+                judge.get_model_name(),
+                entry["prompt_tokens"],
+                entry["completion_tokens"],
+            )
+            for entry in (judge.usage_log or [])[judge_calls_before:]
+        )
+        record_case_cost(
+            eval_run_id,
+            case_id=case_id,
+            run_id=spans.run_id,
+            agent_cost_usd=total_agent_cost(spans),
+            judge_cost_usd=judge_cost,
+        )
+        persist_case_spans(eval_run_id, case_id=case_id, spans=spans)
 
 
 def record_case_cost(
@@ -188,6 +261,25 @@ def record_case_cost(
     }
     with (run_dir / "case-costs.jsonl").open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(record) + "\n")
+
+
+def persist_case_spans(eval_run_id: str, *, case_id: str, spans: RunSpans) -> None:
+    """Write one case's own span dump to
+    `runs/<eval_run_id>/spans/<case_id>.json` (stage 9e, D9e.2), before the
+    `tmp_path_factory` root that produced it is cleaned up.
+
+    Three stages in a row lost a diagnosis to exactly that cleanup (stage
+    9b, 9d, and this stage's own planning session, `insights.md`): the
+    `tmp_path_factory`-rooted span dump `live_settings` redirects to does
+    not survive past the pytest process. Written directly from the
+    already-loaded `RunSpans` rather than re-reading the temp file, since
+    the caller has it in memory anyway.
+    """
+    spans_dir = paths.run_dir(eval_run_id) / "spans"
+    spans_dir.mkdir(parents=True, exist_ok=True)
+    (spans_dir / f"{case_id}.json").write_text(
+        json.dumps(spans.spans, indent=2), encoding="utf-8"
+    )
 
 
 def load_case_costs(eval_run_id: str) -> list[dict[str, Any]]:

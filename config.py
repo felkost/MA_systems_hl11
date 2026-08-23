@@ -154,6 +154,24 @@ class Settings(BaseSettings):
     span_dump_dir: str | None = None
     max_span_payload_length: int = Field(default=2000, ge=100, le=20_000)
 
+    # -- Evaluation tooling (stage 9e). A plain `Settings` field, not a
+    # `_CacheSettings` one (see `export_deepeval_timeout_override`'s own
+    # docstring below): a shell-set override is legitimate here, unlike for
+    # HF_HOME, so ordinary pydantic-settings precedence (env > .env >
+    # default) is exactly right and needs no source-list surgery.
+    # 900s, raised from 600 at stage 9e phase 1b together with
+    # `OpenRouterModel`'s own client timeout (120 -> 180s): the invariant
+    # `PER_TASK >= n_sequential_judge_calls * httpx_timeout + slack` has to
+    # keep holding, and `AnswerRelevancyMetric`'s 3 sequential calls at 180s
+    # each would leave only 60s of slack against the old 600.
+    deepeval_per_task_timeout_seconds: float = Field(default=900.0, gt=0.0)
+    # `None` keeps today's behaviour byte-for-byte reproducible: DeepEval's
+    # OpenRouter payload carries no `reasoning` key at all unless this is
+    # set (D9e.16). Ships disabled -- capping the judge's thinking budget
+    # may change its scoring behaviour, not just its cost, so a probe
+    # decides before this is ever turned on for a real run.
+    judge_reasoning_effort: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE,
         env_file_encoding="utf-8",
@@ -339,3 +357,46 @@ def _export_cache_env() -> None:
 
 
 _export_cache_env()
+
+
+def export_deepeval_timeout_override(settings: Settings) -> None:
+    """Write `settings.deepeval_per_task_timeout_seconds` into DeepEval's
+    own per-task timeout override, at the binding knob (stage 9e, D9e.1).
+
+    Not called at import time (unlike `_export_cache_env`): `Settings()`
+    requires `openrouter_api_key`, which is exactly why the cache-only
+    variables got their own no-required-fields class. Call this once,
+    explicitly, from an eval-tier entry point after `load_settings()`
+    succeeds. Safe because DeepEval re-reads `os.environ` lazily on every
+    `deepeval.config.settings.get_settings()` call -- there is no
+    import-order race here, unlike `HF_HOME`.
+
+    The key is written **literally**, never derived from the field name
+    the way `_export_cache_env` derives `HF_HOME` from `hf_home`. Following
+    that convention here would produce `DEEPEVAL_PER_TASK_TIMEOUT_SECONDS`
+    -- a **deprecated** `computed_field` in the installed DeepEval, absent
+    from `model_fields` and therefore absent from the env fingerprint that
+    decides whether its cached settings singleton rebuilds. Setting it
+    would be silently ignored. The real, live knob is the **suffixed**
+    `DEEPEVAL_PER_TASK_TIMEOUT_SECONDS_OVERRIDE`, a genuine `model_fields`
+    entry -- verified live this stage:
+    `DEEPEVAL_PER_TASK_TIMEOUT_SECONDS_OVERRIDE=600` in the environment
+    makes both `deepeval.config.settings.get_settings()
+    .DEEPEVAL_PER_TASK_TIMEOUT_SECONDS_OVERRIDE` and
+    `deepeval.utils.get_per_task_timeout_seconds()` (the effective value
+    `deepeval/evaluate/execute/e2e.py` actually calls -- imported there
+    from `deepeval.utils`, not from `deepeval.config.settings`, corrected
+    against the installed 4.1.10 after the first import path guessed
+    wrong) read back `600.0`.
+
+    The deadline this actually targets is DeepEval's per-test-case budget
+    (180s by default), not the httpx read timeout `evals/deepeval_model.py`
+    already carries (D9d.4 raised that one, 60 -> 120s, which turned out
+    not to be the knob that was cancelling metrics). The invariant that
+    must hold between the two: `PER_TASK >= n_sequential_judge_calls *
+    httpx_timeout + slack` -- `AnswerRelevancyMetric` alone makes three
+    sequential judge calls.
+    """
+    os.environ["DEEPEVAL_PER_TASK_TIMEOUT_SECONDS_OVERRIDE"] = str(
+        settings.deepeval_per_task_timeout_seconds
+    )

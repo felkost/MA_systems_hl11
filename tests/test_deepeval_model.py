@@ -23,9 +23,17 @@ class _Verdict(BaseModel):
     score: float
 
 
-def _model(response_content: str, usage: dict[str, int]) -> OpenRouterModel:
+def _model(
+    response_content: str,
+    usage: dict[str, int],
+    *,
+    reasoning_effort: str | None = None,
+    captured_payload: dict | None = None,
+) -> OpenRouterModel:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["authorization"] == "Bearer test-key"
+        if captured_payload is not None:
+            captured_payload.update(json.loads(request.content))
         return httpx.Response(
             200,
             json={
@@ -38,6 +46,7 @@ def _model(response_content: str, usage: dict[str, int]) -> OpenRouterModel:
         model_name="openai/gpt-4.1-mini",
         api_key="test-key",
         transport=httpx.MockTransport(handler),
+        reasoning_effort=reasoning_effort,
     )
 
 
@@ -102,9 +111,58 @@ def test_get_model_name_returns_the_configured_id() -> None:
 
 
 def test_default_timeout_is_generous_enough_for_a_full_report_judge_call() -> None:
-    """Stage 9d D9d.4. A judge call carrying a saved report plus a full
-    retrieval context errored on a 60s timeout in each of the two prior live
-    runs -- an errored metric carries no score at all, so the case is lost,
-    not merely slow."""
+    """Stage 9d D9d.4, raised again at stage 9e phase 1b. A judge call
+    carrying a saved report plus a full retrieval context errored at 60s in
+    the 9a/9c runs and again at 120s in the 9e phase-1b run
+    (`adversarial-direct-jailbreak`, `httpx.ReadTimeout`) -- an errored
+    metric carries no score at all, so the case is lost, not merely slow.
+    Each raise followed a measured timeout, never a precaution."""
     model = OpenRouterModel("openai/gpt-4.1-mini", api_key="k")
-    assert model._timeout == 120.0
+    assert model._timeout == 180.0
+
+
+def test_client_timeout_leaves_slack_under_deepevals_per_task_budget() -> None:
+    """D9e.1's invariant, pinned as arithmetic rather than left in prose:
+    `PER_TASK >= n_sequential_judge_calls * httpx_timeout + slack`.
+    `AnswerRelevancyMetric` makes 3 sequential calls, so raising either
+    number without the other silently reintroduces the cancellation this
+    pair exists to prevent."""
+    from config import Settings
+
+    per_task = Settings.model_fields["deepeval_per_task_timeout_seconds"].default
+    client_timeout = OpenRouterModel("openai/gpt-4.1-mini", api_key="k")._timeout
+    sequential_answer_relevancy_calls = 3
+
+    assert per_task > sequential_answer_relevancy_calls * client_timeout
+
+
+# -- Stage 9e, D9e.16: the judge's thinking budget, controllable and off --
+
+
+def test_payload_carries_no_reasoning_key_when_unset() -> None:
+    """The default (`reasoning_effort=None`) must keep today's payload
+    byte-for-byte reproducible -- no `reasoning` key at all."""
+    captured: dict = {}
+    model = _model(
+        "ok",
+        {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        captured_payload=captured,
+    )
+
+    model.generate("anything")
+
+    assert "reasoning" not in captured
+
+
+def test_payload_carries_the_exact_reasoning_effort_when_set() -> None:
+    captured: dict = {}
+    model = _model(
+        "ok",
+        {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        reasoning_effort="low",
+        captured_payload=captured,
+    )
+
+    model.generate("anything")
+
+    assert captured["reasoning"] == {"effort": "low"}

@@ -75,6 +75,21 @@ def wrap_untrusted_content(text: str) -> str:
     return f"{UNTRUSTED_PREAMBLE}{text}{UNTRUSTED_POSTAMBLE}"
 
 
+def _unwrap_untrusted_content(text: str) -> str:
+    """Strip `wrap_untrusted_content`'s markers, recovering the page text
+    alone.
+
+    Used only to build the `retrieval.chunks` span attribute (stage 9e,
+    D9e.7's third lever) -- the model itself always sees the wrapped form;
+    this function exists so `read_url` can record what it fetched
+    symmetrically with `knowledge_search`, whose chunks carry no such
+    wrapper to begin with.
+    """
+    if text.startswith(UNTRUSTED_PREAMBLE) and text.endswith(UNTRUSTED_POSTAMBLE):
+        return text[len(UNTRUSTED_PREAMBLE) : -len(UNTRUSTED_POSTAMBLE)]
+    return text
+
+
 class BlockedUrlError(Exception):
     """A URL was refused because it is not a public http/https address."""
 
@@ -264,13 +279,30 @@ def read_url(url: str) -> str:
     with httpx.Client(
         timeout=settings.http_timeout_seconds, follow_redirects=False
     ) as client:
-        return read_url_with_client(
+        result = read_url_with_client(
             url,
             client,
             max_redirects=settings.max_url_redirects,
             max_content_length=settings.max_url_content_length,
             allow_private=settings.allow_private_network_urls,
         )
+
+    # Stage 9e, D9e.7's third lever: writes `retrieval.chunks` symmetrically
+    # with `knowledge_search` (`_format_passages` above), so a page a real
+    # tool actually fetched counts as grounding for the Groundedness and
+    # Citation Presence metrics -- guarded on the `ERROR:` prefix, since a
+    # failed fetch retrieved nothing.
+    if not result.startswith("ERROR:"):
+        span = trace.get_current_span()
+        span.set_attribute(
+            "retrieval.chunks",
+            [
+                truncate_for_span(
+                    _unwrap_untrusted_content(result), settings.max_span_payload_length
+                )
+            ],
+        )
+    return result
 
 
 @tool

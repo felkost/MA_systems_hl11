@@ -6,6 +6,7 @@ of the two Supervisor-only classes onto this project's own tool names
 
 from __future__ import annotations
 
+import json
 from typing import Any, cast
 
 import pytest
@@ -225,6 +226,23 @@ def test_tracing_middleware_records_token_usage_and_cost_on_model_call() -> None
         assert model_span.attributes["gen_ai.usage.input_tokens"] == 1000
         assert model_span.attributes["gen_ai.usage.output_tokens"] == 500
         assert model_span.attributes["gen_ai.usage.cost_usd"] == pytest.approx(
+            1000 * 0.0000004 + 500 * 0.0000016
+        )
+        # D9e.20: Langfuse only populates its own native model/cost columns
+        # from its own attribute names (`langfuse/_client/attributes.py`),
+        # not from the `gen_ai.*` OTel pair alone -- measured live, stage 9e
+        # phase 1b: every model.* span reached Langfuse with the right
+        # figures sitting unread in `metadata`, and `providedModelName`/
+        # `costDetails`/`totalCost` empty.
+        assert model_span.attributes["gen_ai.request.model"] == "openai/gpt-4.1-mini"
+        assert (
+            model_span.attributes["langfuse.observation.model.name"]
+            == "openai/gpt-4.1-mini"
+        )
+        cost_details = json.loads(
+            model_span.attributes["langfuse.observation.cost_details"]
+        )
+        assert cost_details["total"] == pytest.approx(
             1000 * 0.0000004 + 500 * 0.0000016
         )
     finally:
@@ -590,6 +608,43 @@ def test_save_report_guard_never_nudges_a_run_that_never_reached_research() -> N
 
 def test_save_report_guard_still_nudges_on_approve_unsaved() -> None:
     seen = _nudge_probe(_guard_state(verdict="APPROVE", critique_ids=["c0"]))
+    assert len(seen) == 2
+    assert "save_report" in str(seen[1].messages[-1].content)
+
+
+# -- Stage-9e D9e.14: middleware.py:466-467 removed --
+#
+# `_run_tool_call_ids(messages, "save_report")` used to make the APPROVE
+# branch stand down the moment a save_report call was *emitted*, whether or
+# not it ever executed. That silenced the guard on exactly the runs
+# stage 9c/9d found stuck: a save_report refused by
+# SaveReportVerdictGuardMiddleware on a standing REVISE, or one still
+# pending (e.g. paused at the HITL gate) with no ToolMessage at all yet.
+
+
+def test_save_report_guard_nudges_on_approve_when_the_save_was_refused() -> None:
+    state = _guard_state(verdict="APPROVE", critique_ids=["c0"])
+    state["messages"].append(_ai_with_calls("save_report", ids=["s0"]))
+    state["messages"].append(
+        ToolMessage(
+            content="ERROR: save_report call refused -- the verdict is not " "APPROVE.",
+            tool_call_id="s0",
+            name="save_report",
+            status="error",
+        )
+    )
+    seen = _nudge_probe(state)
+    assert len(seen) == 2
+    assert "save_report" in str(seen[1].messages[-1].content)
+
+
+def test_save_report_guard_nudges_on_approve_when_the_save_is_unresolved() -> None:
+    """The second case the removed check also covered: a save_report call
+    emitted this run with no `ToolMessage` at all yet (e.g. the HITL gate
+    has not returned)."""
+    state = _guard_state(verdict="APPROVE", critique_ids=["c0"])
+    state["messages"].append(_ai_with_calls("save_report", ids=["s0"]))
+    seen = _nudge_probe(state)
     assert len(seen) == 2
     assert "save_report" in str(seen[1].messages[-1].content)
 

@@ -144,3 +144,43 @@ def test_knowledge_search_span_with_no_chunks_attribute_contributes_nothing() ->
     run = RunSpans(run_id="r6", spans=spans)
 
     assert retrieval_context_for_agent(run, "agent.researcher") == []
+
+
+def test_read_url_span_counts_as_retrieval_symmetrically() -> None:
+    # Stage 9e, D9e.7's third lever: `read_url` now writes retrieval.chunks
+    # (tools.py), so a page a real tool fetched grounds the same way a
+    # knowledge_search hit does.
+    spans = [
+        _span("root", None, "repl.question"),
+        _span("agent-researcher", "root", "agent.researcher"),
+        _span("ru-1", "agent-researcher", "tool.read_url", chunks=["page text"]),
+    ]
+    run = RunSpans(run_id="r7", spans=spans)
+
+    assert retrieval_context_for_agent(run, "agent.researcher") == ["page text"]
+
+
+def test_knowledge_search_and_read_url_chunks_combine_in_span_order() -> None:
+    spans = [
+        _span("root", None, "repl.question"),
+        _span("agent-researcher", "root", "agent.researcher"),
+        _span("ks-1", "agent-researcher", "tool.knowledge_search", chunks=["K1"]),
+        _span("ru-1", "agent-researcher", "tool.read_url", chunks=["U1"]),
+    ]
+    run = RunSpans(run_id="r8", spans=spans)
+
+    assert retrieval_context_for_agent(run, "agent.researcher") == ["K1", "U1"]
+
+
+def test_web_search_span_never_counts_as_retrieval() -> None:
+    # A search snippet is not a retrieved document (D9e.7's own scoping
+    # decision) -- web_search stays excluded even if it carried the same
+    # attribute name by accident.
+    spans = [
+        _span("root", None, "repl.question"),
+        _span("agent-researcher", "root", "agent.researcher"),
+        _span("ws-1", "agent-researcher", "tool.web_search", chunks=["snippet"]),
+    ]
+    run = RunSpans(run_id="r9", spans=spans)
+
+    assert retrieval_context_for_agent(run, "agent.researcher") == []

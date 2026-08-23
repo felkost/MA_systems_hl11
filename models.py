@@ -61,6 +61,31 @@ def compute_cost(model: str, input_tokens: int, output_tokens: int) -> float | N
     return input_tokens * prompt_price + output_tokens * completion_price
 
 
+def compute_cost_or_raise(model: str, input_tokens: int, output_tokens: int) -> float:
+    """`compute_cost`, but an unpriced model raises instead of returning
+    `None` (stage 9e, D9e.17).
+
+    `or 0.0` on `compute_cost`'s own `None` return silently records an
+    unpriced model's entire cost as $0.00 -- exactly the "unmeasured
+    component presented as a total" this project forbids. This is the
+    version a caller reporting a real total (never a caller merely checking
+    whether a price exists) should call.
+
+    Raises
+    ------
+    ValueError
+        `model` has no `PRICE_TABLE` entry -- names the model and this file.
+    """
+    cost = compute_cost(model, input_tokens, output_tokens)
+    if cost is None:
+        raise ValueError(
+            f"model {model!r} has no PRICE_TABLE entry in models.py -- add "
+            "its prompt/completion price before using it as a judge or "
+            "agent model, rather than letting its cost read as $0.00"
+        )
+    return cost
+
+
 # The roles whose caller builds a strict structured-output request:
 # "planner"/"critic" via ProviderStrategy(..., strict=True) (agents/planner.py,
 # agents/critic.py, stage 3) -- hardcoded rather than introspected from

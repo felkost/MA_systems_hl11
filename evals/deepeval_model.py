@@ -49,16 +49,28 @@ class OpenRouterModel(DeepEvalBaseLLM):
         model_name: str,
         api_key: str,
         base_url: str = _DEFAULT_BASE_URL,
-        # 120s, not 60: a judge call carrying a full saved report plus a
-        # full retrieval context timed out at 60 in each of the stage-9a and
-        # stage-9c live runs, erroring the metric rather than scoring it.
-        timeout: float = 120.0,
+        # 180s, raised from 120 at stage 9e phase 1b, itself raised from 60
+        # at stage 9d (D9d.4). Each raise was made against a measured
+        # timeout, never pre-emptively: 9a/9c lost metrics at 60s, and the
+        # 9e phase-1b run lost `adversarial-direct-jailbreak`'s Answer
+        # Relevancy to `httpx.ReadTimeout` at 120s -- with DeepEval's own
+        # per-task budget (600s, `Settings.deepeval_per_task_timeout_seconds`)
+        # nowhere near exhausted, which is what identified the client
+        # timeout rather than the task budget as the binding limit.
+        #
+        # The ceiling on this value is the invariant D9e.1 names:
+        # `PER_TASK >= n_sequential_judge_calls * httpx_timeout + slack`.
+        # `AnswerRelevancyMetric` makes 3 sequential calls, so 3 * 180 =
+        # 540s against a 600s budget leaves only 60s of slack -- which is
+        # why the per-task default moves to 900s in the same change.
+        timeout: float = 180.0,
         # httpx.MockTransport implements both BaseTransport and
         # AsyncBaseTransport (httpx/_transports/mock.py); the union below
         # is what lets one test double satisfy both httpx.Client and
         # httpx.AsyncClient below.
         transport: httpx.BaseTransport | httpx.AsyncBaseTransport | None = None,
         usage_log: list[dict[str, int]] | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         # `transport` is a constructor seam for tests -- passing a
         # `httpx.MockTransport` here is how the offline suite exercises this
@@ -83,6 +95,14 @@ class OpenRouterModel(DeepEvalBaseLLM):
         # gets every call's usage, in order, regardless of how many calls
         # one metric measurement made internally.
         self.usage_log: list[dict[str, int]] | None = usage_log
+        # D9e.16: `None` (the default) keeps the payload byte-for-byte what
+        # it always was -- no `reasoning` key at all. Measured this stage:
+        # 89-94% of every judge call's cost is `gemini-2.5-pro`'s own
+        # thinking, billed as completion tokens at $10/M; capping it is the
+        # cheapest lever available, but a judge that thinks less may also
+        # score differently, so this ships disabled until a probe compares
+        # capped and uncapped scores on the same cases.
+        self._reasoning_effort = reasoning_effort
         super().__init__(model=model_name)
 
     def load_model(self) -> "OpenRouterModel":
@@ -115,6 +135,8 @@ class OpenRouterModel(DeepEvalBaseLLM):
                     "strict": True,
                 },
             }
+        if self._reasoning_effort is not None:
+            payload["reasoning"] = {"effort": self._reasoning_effort}
         return payload
 
     def _record_usage(self, body: dict[str, Any]) -> None:

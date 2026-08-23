@@ -463,8 +463,15 @@ class SaveReportGuardMiddleware(
         if request.state.get("verdict") == "APPROVE":
             if not _run_tool_call_ids(messages, "critique"):
                 return None
-            if _run_tool_call_ids(messages, "save_report"):
-                return None
+            # D9e.14: no "already emitted a save_report call" check here.
+            # `_has_executed_save_report` above already returns early for a
+            # *successful* save; this branch is reached whenever a
+            # save_report was emitted but never resolved into a non-error
+            # result -- a refused save (SaveReportVerdictGuardMiddleware),
+            # or one still pending (e.g. paused at the HITL gate). The
+            # removed check treated "emitted" as good enough and went
+            # silent on exactly the runs stage 9c/9d found stuck: a
+            # save_report refused on a standing REVISE, then never retried.
             return _SAVE_REPORT_NUDGE
 
         if not _run_tool_call_ids(messages, "research"):
@@ -795,9 +802,28 @@ class TracingMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, Respons
         model_name = getattr(request.model, "model_name", None)
         if model_name is None:
             return
+        # Two names for one fact, on purpose (stage 9e, D9e.20). The
+        # `gen_ai.*` pair is the OpenTelemetry semantic convention and is
+        # what `runs/<id>/spans.json` -- this project's own source of truth
+        # for every published number -- is read against. The `langfuse.*`
+        # pair is Langfuse's own ingestion contract
+        # (`langfuse/_client/attributes.py`'s `LangfuseOtelSpanAttributes`),
+        # and without it Langfuse has nothing to populate its native model
+        # and cost columns from: measured on the phase-1b run, all 454
+        # `model.*` spans arrived with `providedModelName` and `costDetails`
+        # empty and `totalCost` 0, while carrying the correct figures in
+        # `metadata` the whole time. Nothing was lost in transit; the fields
+        # were simply never written. Token counts needed no such pairing --
+        # Langfuse already maps `gen_ai.usage.input_tokens`/`output_tokens`
+        # into `usageDetails` on its own.
+        span.set_attribute("gen_ai.request.model", model_name)
+        span.set_attribute("langfuse.observation.model.name", model_name)
         cost = compute_cost(model_name, input_tokens, output_tokens)
         if cost is not None:
             span.set_attribute("gen_ai.usage.cost_usd", cost)
+            span.set_attribute(
+                "langfuse.observation.cost_details", json.dumps({"total": cost})
+            )
 
     def wrap_tool_call(
         self,

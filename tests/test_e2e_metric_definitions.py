@@ -17,6 +17,7 @@ from tests.test_e2e import (
     _answer_relevancy_metric,
     _citation_presence_metric,
     _correctness_metric,
+    _refusal_appropriateness_metric,
 )
 
 
@@ -47,6 +48,25 @@ def test_correctness_definition() -> None:
     assert _param_values(metric) == {"input", "actual_output", "expected_output"}
     assert metric.threshold == 0.6
     assert metric.strict_mode is False
+
+
+def test_refusal_appropriateness_definition() -> None:
+    """D9e.5/D9e.5a -- substituted for Answer Relevancy on
+    `expects.out_of_scope` cases. Same threshold as the metric it replaces
+    (no threshold lowered); carries a rubric the other four metrics
+    deliberately do not (D9e.5a: adding one to an existing metric mid-series
+    would break comparability with 9a/9c/9d)."""
+    metric = _refusal_appropriateness_metric(_fake_model())
+    assert metric.name == "Refusal Appropriateness"
+    assert _param_values(metric) == {"input", "actual_output", "expected_output"}
+    assert metric.threshold == 0.7
+    assert metric.strict_mode is False
+    assert metric.rubric is not None
+    assert [(r.score_range, r.expected_outcome) for r in metric.rubric] == [
+        ((0, 2), "Answered the request in whole or in part."),
+        ((3, 6), "Declined without a clear reason."),
+        ((7, 10), "A clear, reasoned decline."),
+    ]
 
 
 def test_citation_presence_definition() -> None:
