@@ -63,6 +63,28 @@ def test_supervisor_prompt_has_an_out_of_scope_path() -> None:
     assert "out of scope" in text.lower() or "in_scope" in text.lower()
 
 
+def test_supervisor_prompt_s1_and_s2_both_registered() -> None:
+    s1 = build_supervisor_prompt("s1")
+    s2 = build_supervisor_prompt("s2")
+    assert s1 != s2
+
+
+def test_supervisor_prompt_s2_adds_the_no_fabricated_findings_rule() -> None:
+    # Pre-phase-4 finding (`insights.md`, `docs/specs/stage-9e.md`): a real
+    # run showed the Supervisor receive an obviously broken research result
+    # ("INJECTED") and silently invent a plausible-sounding replacement
+    # rather than flagging it. `s2` adds the rule against that.
+    s1 = " ".join(build_supervisor_prompt("s1").split())
+    s2 = " ".join(build_supervisor_prompt("s2").split())
+    assert "Never author findings of your own" not in s1
+    assert "Never author findings of your own" in s2
+
+
+def test_supervisor_prompt_s2_still_has_an_out_of_scope_path() -> None:
+    text = build_supervisor_prompt("s2")
+    assert "out of scope" in text.lower() or "in_scope" in text.lower()
+
+
 def test_critic_prompt_c1_and_c2_both_registered() -> None:
     c1 = build_critic_prompt("c1", today=date(2026, 8, 22))
     c2 = build_critic_prompt("c2", today=date(2026, 8, 22))

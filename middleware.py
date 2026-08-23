@@ -204,11 +204,21 @@ class CriticVerificationMiddleware(
     verification twice in a row cannot make this middleware loop.
 
     Defines **both** `wrap_model_call` and `awrap_model_call` (D3.1b).
+
+    `role`, default `"critic"` -- the only role this middleware is ever
+    attached to (`orchestrator.py`/`supervisor.py`'s `critic_graph`), passed
+    to `record_superseded_model_call` so a verification retry's discarded
+    first call still gets its own `model.<role>` span (stage 9e, phase 3
+    R.2 finding: `TracingMiddleware`'s own span otherwise sees only the
+    retried response).
     """
 
-    def __init__(self, min_verification_calls: int = 1) -> None:
+    def __init__(
+        self, min_verification_calls: int = 1, *, role: str = "critic"
+    ) -> None:
         super().__init__()
         self.min_verification_calls = min_verification_calls
+        self.role = role
 
     def wrap_model_call(
         self,
@@ -218,6 +228,7 @@ class CriticVerificationMiddleware(
         response = handler(request)
         if self._calls_a_verification_tool(response) or self._verified_earlier(request):
             return response
+        record_superseded_model_call(self.role, request, response)
         return handler(self._retry_request(request))
 
     async def awrap_model_call(
@@ -230,6 +241,7 @@ class CriticVerificationMiddleware(
         response = await handler(request)
         if self._calls_a_verification_tool(response) or self._verified_earlier(request):
             return response
+        record_superseded_model_call(self.role, request, response)
         return await handler(self._retry_request(request))
 
     @staticmethod
@@ -419,11 +431,19 @@ class SaveReportGuardMiddleware(
     Defines **both** `wrap_model_call` and `awrap_model_call` (D3.1b). Keyed
     on `SUPERVISOR_DELEGATION_TOOLS`'s `"critique"` (D3.7), not hl10's
     `delegate_to_critic`.
+
+    `role`, default `"supervisor"` -- the only role this middleware is ever
+    attached to (`supervisor.py`'s own middleware list), passed to
+    `record_superseded_model_call` for the same reason
+    `CriticVerificationMiddleware` does: a nudge's discarded first response
+    would otherwise leave `TracingMiddleware`'s own span holding only the
+    re-requested response's usage.
     """
 
-    def __init__(self, max_revisions: int) -> None:
+    def __init__(self, max_revisions: int, *, role: str = "supervisor") -> None:
         super().__init__()
         self.max_revisions = max_revisions
+        self.role = role
 
     def wrap_model_call(
         self,
@@ -434,6 +454,7 @@ class SaveReportGuardMiddleware(
         nudge = self._nudge_for(request, response)
         if nudge is None:
             return response
+        record_superseded_model_call(self.role, request, response)
         return handler(self._retry_request(request, nudge))
 
     async def awrap_model_call(
@@ -447,6 +468,7 @@ class SaveReportGuardMiddleware(
         nudge = self._nudge_for(request, response)
         if nudge is None:
             return response
+        record_superseded_model_call(self.role, request, response)
         return await handler(self._retry_request(request, nudge))
 
     def _nudge_for(
@@ -726,6 +748,84 @@ def was_truncated_for_span(text: str) -> bool:
     return _TRUNCATION_MARKER.search(text) is not None
 
 
+def _set_model_call_usage_attributes(
+    span: Any,
+    request: ModelRequest[ContextT],
+    response: ModelResponse[ResponseT],
+) -> None:
+    """Write token-usage and cost attributes for one raw model call onto
+    `span`. Shared by `TracingMiddleware._record_usage` (the final response
+    of a `wrap_model_call`) and `record_superseded_model_call` (a response a
+    retrying middleware is about to discard) so the two cannot drift apart.
+    """
+    usage = next(
+        (
+            message.usage_metadata
+            for message in response.result
+            if isinstance(message, AIMessage) and message.usage_metadata
+        ),
+        None,
+    )
+    if usage is None:
+        return
+    input_tokens = usage.get("input_tokens", 0)
+    output_tokens = usage.get("output_tokens", 0)
+    span.set_attribute("gen_ai.usage.input_tokens", input_tokens)
+    span.set_attribute("gen_ai.usage.output_tokens", output_tokens)
+    model_name = getattr(request.model, "model_name", None)
+    if model_name is None:
+        return
+    # Two names for one fact, on purpose (stage 9e, D9e.20). The
+    # `gen_ai.*` pair is the OpenTelemetry semantic convention and is
+    # what `runs/<id>/spans.json` -- this project's own source of truth
+    # for every published number -- is read against. The `langfuse.*`
+    # pair is Langfuse's own ingestion contract
+    # (`langfuse/_client/attributes.py`'s `LangfuseOtelSpanAttributes`),
+    # and without it Langfuse has nothing to populate its native model
+    # and cost columns from: measured on the phase-1b run, all 454
+    # `model.*` spans arrived with `providedModelName` and `costDetails`
+    # empty and `totalCost` 0, while carrying the correct figures in
+    # `metadata` the whole time. Nothing was lost in transit; the fields
+    # were simply never written. Token counts needed no such pairing --
+    # Langfuse already maps `gen_ai.usage.input_tokens`/`output_tokens`
+    # into `usageDetails` on its own.
+    span.set_attribute("gen_ai.request.model", model_name)
+    span.set_attribute("langfuse.observation.model.name", model_name)
+    cost = compute_cost(model_name, input_tokens, output_tokens)
+    if cost is not None:
+        span.set_attribute("gen_ai.usage.cost_usd", cost)
+        span.set_attribute(
+            "langfuse.observation.cost_details", json.dumps({"total": cost})
+        )
+
+
+def record_superseded_model_call(
+    role: str,
+    request: ModelRequest[ContextT],
+    response: ModelResponse[ResponseT],
+) -> None:
+    """Emit a standalone `model.<role>` span for one real, billed model call
+    that a retrying middleware is about to discard (stage 9e, phase 3,
+    `docs/specs/stage-9e.md`'s dated R.2 line).
+
+    `TracingMiddleware`'s own `model.<role>` span wraps the whole node visit
+    -- one `handler()` call from its own perspective -- so when an inner
+    middleware retries by calling `handler()` a second time
+    (`CriticVerificationMiddleware`, `SaveReportGuardMiddleware`,
+    `grounding.UnsupportedClaimMiddleware`), `TracingMiddleware` only ever
+    sees the final response; the first call's tokens, though real and
+    billed, were never recorded in any span. Every retrying middleware calls
+    this once per response it is about to discard, right before retrying --
+    it already holds that response to decide whether to retry at all. The
+    final response is left to `TracingMiddleware`'s own span, unchanged, so
+    N real model calls now produce N spans between the two mechanisms
+    together.
+    """
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span(f"model.{role}") as span:
+        _set_model_call_usage_attributes(span, request, response)
+
+
 class TracingMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, ResponseT]):
     """One span per model call (`model.<role>`, token usage and cost as
     attributes) and one per tool call (`tool.<name>`, args and result,
@@ -785,45 +885,7 @@ class TracingMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, Respons
         request: ModelRequest[ContextT],
         response: ModelResponse[ResponseT],
     ) -> None:
-        usage = next(
-            (
-                message.usage_metadata
-                for message in response.result
-                if isinstance(message, AIMessage) and message.usage_metadata
-            ),
-            None,
-        )
-        if usage is None:
-            return
-        input_tokens = usage.get("input_tokens", 0)
-        output_tokens = usage.get("output_tokens", 0)
-        span.set_attribute("gen_ai.usage.input_tokens", input_tokens)
-        span.set_attribute("gen_ai.usage.output_tokens", output_tokens)
-        model_name = getattr(request.model, "model_name", None)
-        if model_name is None:
-            return
-        # Two names for one fact, on purpose (stage 9e, D9e.20). The
-        # `gen_ai.*` pair is the OpenTelemetry semantic convention and is
-        # what `runs/<id>/spans.json` -- this project's own source of truth
-        # for every published number -- is read against. The `langfuse.*`
-        # pair is Langfuse's own ingestion contract
-        # (`langfuse/_client/attributes.py`'s `LangfuseOtelSpanAttributes`),
-        # and without it Langfuse has nothing to populate its native model
-        # and cost columns from: measured on the phase-1b run, all 454
-        # `model.*` spans arrived with `providedModelName` and `costDetails`
-        # empty and `totalCost` 0, while carrying the correct figures in
-        # `metadata` the whole time. Nothing was lost in transit; the fields
-        # were simply never written. Token counts needed no such pairing --
-        # Langfuse already maps `gen_ai.usage.input_tokens`/`output_tokens`
-        # into `usageDetails` on its own.
-        span.set_attribute("gen_ai.request.model", model_name)
-        span.set_attribute("langfuse.observation.model.name", model_name)
-        cost = compute_cost(model_name, input_tokens, output_tokens)
-        if cost is not None:
-            span.set_attribute("gen_ai.usage.cost_usd", cost)
-            span.set_attribute(
-                "langfuse.observation.cost_details", json.dumps({"total": cost})
-            )
+        _set_model_call_usage_attributes(span, request, response)
 
     def wrap_tool_call(
         self,

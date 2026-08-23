@@ -108,9 +108,24 @@ DIRECTIONAL_FORBIDDEN_PAIRS: tuple[tuple[str, str], ...] = (
 )
 
 # Directories that hold no project modules: virtualenvs, caches, local-only
-# working areas, and the test suite itself.
+# working areas, and the test suite itself. `.claude` covers Claude Code's
+# own worktree isolation (`.claude/worktrees/<name>/`), which can hold a
+# full nested checkout of this repo while a background session runs --
+# without this, that checkout's own `.py` files get treated as project
+# modules absent from `LAYER_OF_MODULE`, failing this test for a reason
+# that has nothing to do with this project's own code.
 _SKIPPED_DIRS = frozenset(
-    {".venv", ".cache", ".git", "__pycache__", "docs", "tests", "index", "runs"}
+    {
+        ".venv",
+        ".cache",
+        ".git",
+        ".claude",
+        "__pycache__",
+        "docs",
+        "tests",
+        "index",
+        "runs",
+    }
 )
 
 

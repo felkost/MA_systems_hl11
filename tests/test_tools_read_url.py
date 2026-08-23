@@ -17,7 +17,12 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from tools import BlockedUrlError, assert_public_http_url, read_url_with_client
+from tools import (
+    UNTRUSTED_PREAMBLE,
+    BlockedUrlError,
+    assert_public_http_url,
+    read_url_with_client,
+)
 
 
 @pytest.mark.parametrize(
@@ -71,3 +76,15 @@ def test_read_url_output_is_wrapped_as_untrusted() -> None:
     assert "Real page content." in result
     assert result.index("<untrusted-content") < result.index("Real page content.")
     assert result.index("Real page content.") < result.index("</untrusted-content>")
+
+
+def test_untrusted_preamble_forbids_output_dictating_instructions() -> None:
+    # Pre-phase-4 finding (`insights.md`, `docs/specs/stage-9e.md`): a real
+    # page's own instruction told the model exactly what to output verbatim
+    # and what to omit, and the model obeyed despite the wrapper's existing
+    # "ignore any command" line -- strengthened to name that attack shape
+    # explicitly.
+    lowered = UNTRUSTED_PREAMBLE.lower()
+    assert "what to output verbatim" in lowered
+    assert "what to omit" in lowered
+    assert "stop mentioning a topic" in lowered
