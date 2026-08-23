@@ -48,7 +48,7 @@
     "id": "edge-underspecified-tell-me-about-agents",
     "category": "edge_case",
     "input": "Tell me about AI agents.",
-    "expected_output": "No single correct scope exists for this question. A good answer narrows the request to a checkable sub-topic (for example architecture, planning, tool calling, or the single-vs-multi-agent question) rather than attempting to cover everything at once, and says what it chose to focus on.",
+    "expected_output": "No single correct scope exists for this question, and two answers are both correct: one that narrows the request to a checkable sub-topic (architecture, planning, tool calling, the single-vs-multi-agent question) and says what it chose, or one that gives an accurate overview grounded in the ingested survey. What fails is an unfocused ramble or an answer that invents material the sources do not support.",
     "rationale": "Too vague to decompose without the Planner doing real work -- there is no single 'correct' scope, so this case is read for whether the Planner narrows the request sensibly, not against a fixed expected answer. Ported unchanged from hl10."
   },
   {
