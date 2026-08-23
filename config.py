@@ -80,9 +80,12 @@ class Settings(BaseSettings):
     # -- Prompt versions (prompts.py, stage 3). `critic_prompt_version`
     # defaults to "c2", the coupled verdict/booleans version -- matching
     # hl8's own default and what docs/task-hl11.md's Critique Quality GEval
-    # measures against (docs/specs/stage-3.md, D3.4).
+    # measures against (docs/specs/stage-3.md, D3.4). `researcher_prompt_version`
+    # defaults to "r2": "r1" filled gaps its own retrieved sources did not
+    # support with plausible-sounding invented facts; "r2" adds an explicit
+    # instruction against that, and "r1" stays registered for comparison.
     planner_prompt_version: str = "p1"
-    researcher_prompt_version: str = "r1"
+    researcher_prompt_version: str = "r2"
     critic_prompt_version: str = "c2"
     supervisor_prompt_version: str = "s1"
     composer_prompt_version: str = "w1"

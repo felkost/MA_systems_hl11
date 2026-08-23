@@ -74,6 +74,19 @@ def test_build_composer_prompt_raises_on_unknown_version() -> None:
         build_composer_prompt("w99")
 
 
+def test_researcher_prompt_r1_and_r2_both_registered() -> None:
+    r1 = build_researcher_prompt("r1")
+    r2 = build_researcher_prompt("r2")
+    assert r1 != r2
+
+
+def test_researcher_prompt_r2_warns_against_filling_gaps_with_guesses() -> None:
+    r1 = build_researcher_prompt("r1")
+    r2 = build_researcher_prompt("r2")
+    assert "does not address part of the question" not in r1
+    assert "does not address part of the question" in r2
+
+
 def test_composer_prompt_is_a_separate_registry_from_the_supervisor() -> None:
     # D4.4: a composer prompt must not be reachable through
     # `build_supervisor_prompt` -- registering it in `s*` would let
