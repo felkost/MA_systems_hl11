@@ -34,7 +34,15 @@ from deepeval.test_run.test_run import LATEST_FULL_TEST_RUN_FILE_PATH
 import paths
 
 _E2E_METRIC_NAMES = frozenset(
-    {"Answer Relevancy", "Correctness [GEval]", "Citation Presence [GEval]"}
+    {
+        "Answer Relevancy",
+        "Correctness [GEval]",
+        "Citation Presence [GEval]",
+        # D9e.5: substituted for Answer Relevancy on `expects.out_of_scope`
+        # cases, so an e2e case now carries one of two possible trios, both
+        # subsets of this four-name superset -- never all four at once.
+        "Refusal Appropriateness [GEval]",
+    }
 )
 _GOLDEN_DATASET_PATH = paths.PROJECT_ROOT / "tests" / "golden_dataset.json"
 
@@ -59,8 +67,18 @@ class UnknownCaseError(RuntimeError):
     "fail loudly on an unrecognised mapping" discipline)."""
 
 
-def load_latest_run() -> dict[str, Any]:
-    """Read and JSON-parse DeepEval's own persisted full test-run file.
+def load_latest_run(path: Path | None = None) -> dict[str, Any]:
+    """Read and JSON-parse a persisted DeepEval full test-run file.
+
+    Parameters
+    ----------
+    path : Path, optional
+        Defaults to DeepEval's own `LATEST_FULL_TEST_RUN_FILE_PATH` -- the
+        existing no-argument caller is byte-for-byte unaffected. Stage 9e's
+        `evals.aggregate_runs` passes an explicit snapshot path instead
+        (D9e.2a): the **second** `deepeval test run` invocation overwrites
+        that same file, so anything needing more than one invocation's
+        result must read from a snapshot taken before the next run.
 
     Raises
     ------
@@ -68,13 +86,15 @@ def load_latest_run() -> dict[str, Any]:
         No such file -- named with the exact command needed, not a bare
         "file not found".
     """
-    path = paths.resolve(LATEST_FULL_TEST_RUN_FILE_PATH)
-    if not path.is_file():
+    resolved = (
+        path if path is not None else paths.resolve(LATEST_FULL_TEST_RUN_FILE_PATH)
+    )
+    if not resolved.is_file():
         raise FileNotFoundError(
-            f"{path} does not exist -- run `deepeval test run tests/` (with "
-            "tests/test_e2e.py included) before summarize_e2e"
+            f"{resolved} does not exist -- run `deepeval test run tests/` "
+            "(with tests/test_e2e.py included) before summarize_e2e"
         )
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(resolved.read_text(encoding="utf-8"))
 
 
 def _category_by_id() -> dict[str, str]:
@@ -88,10 +108,19 @@ def filter_e2e_cases(
     """Keep only `testCases` entries scored by this stage's own three
     metrics, tagged with their golden-dataset category.
 
-    Filters on metric identity (the three names this stage itself owns),
-    not on the case name's own shape -- robust regardless of how many other
-    eval-tier files (stage 7/8's component and tool-correctness tests) were
-    collected in the same `deepeval test run` invocation.
+    Filters on metric identity (names this stage itself owns), not on the
+    case name's own shape -- robust regardless of how many other eval-tier
+    files (stage 7/8's component and tool-correctness tests) were collected
+    in the same `deepeval test run` invocation.
+
+    Membership, not equality (D9e.6): since D9e.5, an e2e case carries one
+    of *two* possible three-metric trios (Answer Relevancy or Refusal
+    Appropriateness, never both), both subsets of `_E2E_METRIC_NAMES`'
+    four-name superset. An equality check against one fixed set would drop
+    every substituted-trio case from the summary **and the Overall
+    denominator** -- silently, the same failure shape D9e.2a's snapshot
+    mechanism exists to prevent elsewhere. Guarded against an empty
+    `metricsData` list, which is vacuously a subset of anything.
 
     Raises
     ------
@@ -101,7 +130,7 @@ def filter_e2e_cases(
     filtered: list[dict[str, Any]] = []
     for case in run.get("testCases", []):
         metric_names = {metric["name"] for metric in case.get("metricsData", [])}
-        if metric_names != _E2E_METRIC_NAMES:
+        if not metric_names or not metric_names <= _E2E_METRIC_NAMES:
             continue
         category = category_by_id.get(case["name"])
         if category is None:
@@ -278,7 +307,7 @@ def _discover_latest_eval_run_id() -> str:
     return candidates[-1].parent.name
 
 
-def main(eval_run_id: str | None = None) -> Path:
+def main(eval_run_id: str | None = None, *, run: dict[str, Any] | None = None) -> Path:
     """Read both sources, join them, write `eval-results.json` and
     `summary.md` under `runs/<eval_run_id>/`, and return that directory.
 
@@ -287,11 +316,18 @@ def main(eval_run_id: str | None = None) -> Path:
     eval_run_id : str, optional
         Defaults to the most recently modified `runs/*/case-costs.jsonl`'s
         own directory.
+    run : dict, optional
+        An already-parsed DeepEval run (stage 9e, D9e.2a) -- when supplied,
+        `load_latest_run()` is not called at all. `evals.aggregate_runs`
+        passes the in-memory merge of several invocations' own snapshots
+        here; the default (`None`) keeps this function's original,
+        single-invocation behaviour unchanged.
     """
     if eval_run_id is None:
         eval_run_id = _discover_latest_eval_run_id()
 
-    run = load_latest_run()
+    if run is None:
+        run = load_latest_run()
     cases = filter_e2e_cases(run, category_by_id=_category_by_id())
     component_groups = group_component_cases(run)
     case_costs = load_case_costs(eval_run_id)

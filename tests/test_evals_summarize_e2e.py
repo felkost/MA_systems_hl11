@@ -237,6 +237,36 @@ def test_render_summary_markdown_shows_every_test_file_with_its_own_lines() -> N
     assert "Overall: 4/6 passed (66.7%)" in summary
 
 
+def test_filter_e2e_cases_keeps_a_case_scored_by_refusal_appropriateness() -> None:
+    """D9e.5/D9e.6: since the metric substitution, an e2e case carries one
+    of two possible trios (Answer Relevancy or Refusal Appropriateness),
+    both subsets of the four-name superset -- never both trios at once. The
+    old equality check would have dropped this case from the summary and
+    from the Overall denominator entirely."""
+    run = {
+        "testCases": [
+            {
+                "name": "edge-out-of-scope-recipe",
+                "metricsData": [
+                    _metric("Refusal Appropriateness [GEval]", 0.9, 0.7, True),
+                    _metric("Correctness [GEval]", 0.9, 0.6, True),
+                    _metric("Citation Presence [GEval]", 1.0, 0.6, True),
+                ],
+            }
+        ]
+    }
+    filtered = filter_e2e_cases(run, category_by_id=_CATEGORY_BY_ID)
+    assert [case["name"] for case in filtered] == ["edge-out-of-scope-recipe"]
+
+
+def test_filter_e2e_cases_drops_a_case_with_no_metrics_at_all() -> None:
+    """The membership check's own guard: an empty `metricsData` list is
+    vacuously a subset of any set, so it must be excluded explicitly rather
+    than falling through to a false match."""
+    run = {"testCases": [{"name": "some-case", "metricsData": []}]}
+    assert filter_e2e_cases(run, category_by_id=_CATEGORY_BY_ID) == []
+
+
 def test_render_summary_markdown_without_component_groups_is_e2e_only() -> None:
     """The stage-9a shape stays available: a run over `tests/test_e2e.py`
     alone must not sprout empty headings for files it never collected."""

@@ -140,6 +140,21 @@ def test_price_table_covers_every_resolved_agent_and_judge_model() -> None:
     assert settings.judge_model_name in observability.PRICE_TABLE
 
 
+def test_compute_cost_or_raise_returns_the_same_value_as_compute_cost() -> None:
+    assert observability.compute_cost_or_raise(
+        "openai/gpt-4.1-mini", 1000, 500
+    ) == observability.compute_cost("openai/gpt-4.1-mini", 1000, 500)
+
+
+def test_compute_cost_or_raise_names_the_model_for_an_unpriced_one() -> None:
+    """D9e.17: `tests/test_e2e.py` used to apply `or 0.0` to `compute_cost`,
+    which silently recorded an unpriced judge model's entire cost as $0.00.
+    An unknown model must fail loudly instead, naming the model, not return
+    a silent zero."""
+    with pytest.raises(ValueError, match="vendor/unpriced-model"):
+        observability.compute_cost_or_raise("vendor/unpriced-model", 100, 50)
+
+
 def test_rotating_file_logger_writes_trace_id_or_dash(tmp_path: Path) -> None:
     logger = observability.configure_file_logging(
         "test-service", _settings(), log_dir=tmp_path

@@ -33,7 +33,11 @@ import paths
 from middleware import was_truncated_for_span
 
 _TOOL_SPAN_PREFIX = "tool."
-_KNOWLEDGE_SEARCH_SPAN = "tool.knowledge_search"
+# Stage 9e, D9e.7's third lever: `read_url` now writes `retrieval.chunks`
+# symmetrically with `knowledge_search` (`tools.py`), so both span names
+# count as retrieval here. `web_search` stays excluded on purpose -- a
+# search snippet is not a retrieved document.
+_RETRIEVAL_SPAN_NAMES = frozenset({"tool.knowledge_search", "tool.read_url"})
 
 _REQUIRED_SPAN_FIELDS = (
     "trace_id",
@@ -142,20 +146,22 @@ def retrieval_context_for_agent(
     `knowledge_search` call belongs to `agent.planner` alongside the
     Researcher's own, another where a third belongs to `agent.critic`.
 
-    Walks each `tool.knowledge_search` span's `parent_span_id` chain and
-    keeps it only if `agent_span_name` appears somewhere in that chain. A
-    span whose walk hits a `parent_span_id` absent from `run.spans` is
-    **excluded**, never assumed in scope -- an incomplete dump must not
-    silently widen what counts as this agent's own retrieval.
+    Walks each `tool.knowledge_search`/`tool.read_url` span's
+    `parent_span_id` chain and keeps it only if `agent_span_name` appears
+    somewhere in that chain. A span whose walk hits a `parent_span_id`
+    absent from `run.spans` is **excluded**, never assumed in scope -- an
+    incomplete dump must not silently widen what counts as this agent's
+    own retrieval.
 
     Parameters
     ----------
     run : RunSpans
     agent_span_name : str or None
         E.g. `"agent.researcher"`. `None` is whole-run scope -- every
-        `knowledge_search` call in the run, whichever agent made it. That
-        is the right scope for a system-wide metric judging the run's
-        output as a whole, and the wrong one for judging a single agent.
+        `knowledge_search`/`read_url` call in the run, whichever agent made
+        it. That is the right scope for a system-wide metric judging the
+        run's output as a whole, and the wrong one for judging a single
+        agent.
 
     Returns
     -------
@@ -166,7 +172,7 @@ def retrieval_context_for_agent(
     seen: set[str] = set()
     chunks: list[str] = []
     for span in _spans_in_scope(run, agent_span_name):
-        if span["name"] != _KNOWLEDGE_SEARCH_SPAN:
+        if span["name"] not in _RETRIEVAL_SPAN_NAMES:
             continue
         for chunk in span.get("attributes", {}).get("retrieval.chunks", []):
             if chunk not in seen:

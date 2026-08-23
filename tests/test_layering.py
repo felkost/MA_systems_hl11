@@ -51,6 +51,7 @@ LAYER_OF_MODULE: dict[str, str] = {
     "prompts": DOMAIN,
     "tools": INFRA,
     "middleware": INFRA,
+    "grounding": INFRA,
     "models": INFRA,
     "retriever": INFRA,
     "ingest": INFRA,
@@ -60,6 +61,7 @@ LAYER_OF_MODULE: dict[str, str] = {
     "evals.deepeval_model": OBS,
     "evals.runner": OBS,
     "evals.summarize_e2e": OBS,
+    "evals.aggregate_runs": OBS,
 }
 
 #  Stage 2 finding: a layer must be allowed to import itself. The table in

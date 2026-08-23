@@ -32,7 +32,6 @@ into an "and".
 from __future__ import annotations
 
 import pytest
-from deepeval.evaluate import assert_test
 from deepeval.metrics import ToolCorrectnessMetric
 from deepeval.metrics.base_metric import BaseMetric
 from deepeval.models.base_model import DeepEvalBaseLLM
@@ -41,9 +40,10 @@ from langchain_core.messages import ToolMessage
 
 import tools
 from config import Settings
+from evals.deepeval_model import OpenRouterModel
 from evals.runner import build_llm_test_case
 from schemas import RESEARCH_INPUT_TEMPLATE
-from tests.conftest import golden_input, judge_model, skip_without_index
+from tests.conftest import golden_input, run_judged_case, skip_without_index
 from tests.live_agents import AGENT_SPAN_NAME, run_agent_live
 from tests.live_supervisor import run_supervisor_live
 
@@ -74,7 +74,11 @@ def _tool_correctness_metric(
     )
 
 
-def test_planner_tools(live_settings: Settings) -> None:
+def test_planner_tools(
+    live_settings: Settings,
+    eval_run_id: str,
+    component_judge_model: OpenRouterModel,
+) -> None:
     """R3a -- a Planner given a research question reaches for search."""
     skip_without_index()
     case_id = "core-single-vs-multi-agent"
@@ -89,8 +93,15 @@ def test_planner_tools(live_settings: Settings) -> None:
         expected_tools=[_expect("web_search"), _expect("knowledge_search")],
         name="test_planner_tools",
     )
-    metrics: list[BaseMetric] = [_tool_correctness_metric(judge_model(live_settings))]
-    assert_test(case, metrics)
+    metrics: list[BaseMetric] = [_tool_correctness_metric(component_judge_model)]
+    run_judged_case(
+        eval_run_id,
+        case_id="test_planner_tools",
+        test_case=case,
+        metrics=metrics,
+        judge=component_judge_model,
+        spans=live.spans,
+    )
 
 
 def _expected_tools_from_sources(sources: list[str]) -> list[ToolCall]:
@@ -118,7 +129,11 @@ def _expected_tools_from_sources(sources: list[str]) -> list[ToolCall]:
     return expected
 
 
-def test_researcher_tools(live_settings: Settings) -> None:
+def test_researcher_tools(
+    live_settings: Settings,
+    eval_run_id: str,
+    component_judge_model: OpenRouterModel,
+) -> None:
     """R3b -- a Researcher uses the tools its plan's `sources_to_check` names.
 
     The plan is produced live rather than hand-written, so what this
@@ -147,8 +162,15 @@ def test_researcher_tools(live_settings: Settings) -> None:
         expected_tools=expected_tools,
         name="test_researcher_tools",
     )
-    metrics: list[BaseMetric] = [_tool_correctness_metric(judge_model(live_settings))]
-    assert_test(case, metrics)
+    metrics: list[BaseMetric] = [_tool_correctness_metric(component_judge_model)]
+    run_judged_case(
+        eval_run_id,
+        case_id="test_researcher_tools",
+        test_case=case,
+        metrics=metrics,
+        judge=component_judge_model,
+        spans=live.spans,
+    )
 
 
 def _assert_approved_before_saving(messages: list[ToolMessage | object]) -> None:
@@ -185,6 +207,8 @@ def test_supervisor_save(
     live_settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path_factory: pytest.TempPathFactory,
+    eval_run_id: str,
+    component_judge_model: OpenRouterModel,
 ) -> None:
     """R3c -- an approved run ends by calling `save_report`, in that order.
 
@@ -211,6 +235,13 @@ def test_supervisor_save(
         name="test_supervisor_save",
     )
     metrics: list[BaseMetric] = [
-        _tool_correctness_metric(judge_model(live_settings), ordering=True)
+        _tool_correctness_metric(component_judge_model, ordering=True)
     ]
-    assert_test(case, metrics)
+    run_judged_case(
+        eval_run_id,
+        case_id="test_supervisor_save",
+        test_case=case,
+        metrics=metrics,
+        judge=component_judge_model,
+        spans=live.spans,
+    )

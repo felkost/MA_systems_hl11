@@ -69,6 +69,23 @@ def test_critic_prompt_c1_and_c2_both_registered() -> None:
     assert c1 != c2
 
 
+def test_critic_prompt_c3_adds_the_well_evidenced_absence_rule() -> None:
+    # D9e.7 (`c3`): the only new content over c2 is the rule that a
+    # well-evidenced absence counts as completeness, not a gap -- discounted
+    # by the second clause ("name a source"), already present in c2.
+    c2 = " ".join(build_critic_prompt("c2", today=date(2026, 8, 22)).split())
+    c3 = " ".join(build_critic_prompt("c3", today=date(2026, 8, 22)).split())
+    assert "well-evidenced absence is completeness" not in c2
+    assert "well-evidenced absence is completeness" in c3
+
+
+def test_critic_prompt_c3_keeps_c2s_verdict_boolean_coupling_rule() -> None:
+    # c3 must not silently drop the rule Critique Quality's own GEval steps
+    # measure against (D3.4) while adding the absence-is-completeness rule.
+    c3 = build_critic_prompt("c3", today=date(2026, 8, 22))
+    assert "never an APPROVE alongside an unresolved gap" in c3
+
+
 def test_build_composer_prompt_raises_on_unknown_version() -> None:
     with pytest.raises(KeyError):
         build_composer_prompt("w99")

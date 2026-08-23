@@ -68,6 +68,7 @@ from agents.critic import create_critic_agent
 from agents.planner import PLANNER_TOOL_CALL_LIMIT, create_planner_agent
 from agents.research import create_research_agent
 from config import Settings
+from grounding import UnsupportedClaimMiddleware
 from middleware import (
     CriticVerificationMiddleware,
     ReadUrlCapMiddleware,
@@ -158,6 +159,7 @@ def create_orchestrator_graph(
                 tool_call_limit=settings.researcher_max_tool_calls, role="researcher"
             ),
             ReadUrlCapMiddleware(settings.max_read_url_per_search),
+            UnsupportedClaimMiddleware(),
         ],
     )
     critic_graph = create_critic_agent(
