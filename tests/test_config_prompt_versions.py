@@ -27,7 +27,7 @@ def test_critic_prompt_defaults_to_c2() -> None:
 
 def test_prompt_versions_have_sensible_defaults() -> None:
     settings = _settings()
-    assert settings.planner_prompt_version == "p1"
+    assert settings.planner_prompt_version == "p2"
     assert settings.researcher_prompt_version == "r2"
     assert settings.supervisor_prompt_version == "s2"
 

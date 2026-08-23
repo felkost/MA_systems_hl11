@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     # defaults to "r2": "r1" filled gaps its own retrieved sources did not
     # support with plausible-sounding invented facts; "r2" adds an explicit
     # instruction against that, and "r1" stays registered for comparison.
-    planner_prompt_version: str = "p1"
+    planner_prompt_version: str = "p2"
     researcher_prompt_version: str = "r2"
     critic_prompt_version: str = "c2"
     supervisor_prompt_version: str = "s2"

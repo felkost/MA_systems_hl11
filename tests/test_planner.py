@@ -23,7 +23,14 @@ from deepeval.test_case import LLMTestCase, SingleTurnParams
 
 from config import Settings
 from evals.deepeval_model import OpenRouterModel
-from tests.conftest import golden_input, run_judged_case, skip_without_index
+from evals.runner import total_agent_cost
+from tests.conftest import (
+    golden_input,
+    persist_case_spans,
+    record_case_cost,
+    run_judged_case,
+    skip_without_index,
+)
 from tests.live_agents import run_agent_live
 
 pytestmark = pytest.mark.eval
@@ -106,3 +113,42 @@ def test_plan_has_queries(
         eval_run_id=eval_run_id,
         component_judge_model=component_judge_model,
     )
+
+
+def test_planner_recognizes_incoherent_nonsense_as_out_of_scope(
+    live_settings: Settings, eval_run_id: str
+) -> None:
+    """D9e.8 (`p2`) -- deterministic, no judge: `failure-nonsense-query`'s
+    own input has no coherent research question inside it, and `p2`'s new
+    incoherence criterion says that is out of scope the same way a personal
+    request is, not a topic for the Planner to invent a plan around.
+
+    `assert plan.in_scope is False` is the whole check -- no GEval, no
+    threshold, at the live agent's own cost alone (~$0.005 per the spec's
+    own estimate). Cost and spans are still persisted (`record_case_cost`
+    with `judge_cost_usd=0.0`), matching this project's own "no number is
+    published without saying what it rests on" for every live call, judged
+    or not.
+    """
+    skip_without_index()
+    agent_input = golden_input("failure-nonsense-query")
+    live = run_agent_live("planner", agent_input, settings=live_settings)
+    try:
+        assert live.plan is not None, "failure-nonsense-query: planner returned no plan"
+        assert live.plan.in_scope is False, (
+            "failure-nonsense-query: p2's incoherence criterion should have "
+            f"set in_scope to False; got {live.plan!r}"
+        )
+    finally:
+        record_case_cost(
+            eval_run_id,
+            case_id="test_planner_recognizes_incoherent_nonsense_as_out_of_scope",
+            run_id=live.run_id,
+            agent_cost_usd=total_agent_cost(live.spans),
+            judge_cost_usd=0.0,
+        )
+        persist_case_spans(
+            eval_run_id,
+            case_id="test_planner_recognizes_incoherent_nonsense_as_out_of_scope",
+            spans=live.spans,
+        )

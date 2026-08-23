@@ -33,6 +33,38 @@ def test_build_planner_prompt_raises_on_unknown_version() -> None:
         build_planner_prompt("p99")
 
 
+def test_planner_prompt_p1_and_p2_both_registered() -> None:
+    p1 = build_planner_prompt("p1")
+    p2 = build_planner_prompt("p2")
+    assert p1 != p2
+
+
+def test_planner_prompt_p2_adds_the_incoherence_criterion() -> None:
+    # D9e.8 (`p2`): the only genuinely new content over p1 is treating an
+    # incoherent request (gibberish, no identifiable topic) as out of scope
+    # -- "judging scope is a decision to make immediately" is already in p1
+    # verbatim, so it is not what distinguishes p2.
+    p1 = " ".join(build_planner_prompt("p1").split())
+    p2 = " ".join(build_planner_prompt("p2").split())
+    assert "not coherent enough to research" not in p1
+    assert "not coherent enough to research" in p2
+
+
+def test_planner_prompt_p2_no_longer_names_the_golden_recipe_example() -> None:
+    # D9e.9: the borscht example is generalised away -- it matched
+    # edge-out-of-scope-recipe's own subject verbatim, which is teaching to
+    # the test rather than illustrating the rule.
+    p1 = build_planner_prompt("p1")
+    p2 = build_planner_prompt("p2")
+    assert "borscht" in p1
+    assert "borscht" not in p2
+
+
+def test_planner_prompt_p2_still_judges_scope_immediately() -> None:
+    text = " ".join(build_planner_prompt("p2").split())
+    assert "decision to make immediately" in text
+
+
 def test_build_researcher_prompt_raises_on_unknown_version() -> None:
     with pytest.raises(KeyError):
         build_researcher_prompt("r99")
