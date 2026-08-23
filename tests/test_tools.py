@@ -87,6 +87,7 @@ def test_planner_tools(live_settings: Settings) -> None:
         actual_output=live.output,
         agent_span_name=AGENT_SPAN_NAME["planner"],
         expected_tools=[_expect("web_search"), _expect("knowledge_search")],
+        name="test_planner_tools",
     )
     metrics: list[BaseMetric] = [_tool_correctness_metric(judge_model(live_settings))]
     assert_test(case, metrics)
@@ -144,6 +145,7 @@ def test_researcher_tools(live_settings: Settings) -> None:
         actual_output=live.output,
         agent_span_name=AGENT_SPAN_NAME["researcher"],
         expected_tools=expected_tools,
+        name="test_researcher_tools",
     )
     metrics: list[BaseMetric] = [_tool_correctness_metric(judge_model(live_settings))]
     assert_test(case, metrics)
@@ -206,6 +208,7 @@ def test_supervisor_save(
         input=request,
         actual_output=live.output,
         expected_tools=[_expect("critique"), _expect("save_report")],
+        name="test_supervisor_save",
     )
     metrics: list[BaseMetric] = [
         _tool_correctness_metric(judge_model(live_settings), ordering=True)

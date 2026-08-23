@@ -506,3 +506,106 @@ def test_stability_tools_match_the_supervisor_tool_names() -> None:
     `test_forbidden_pairs_never_import_each_other`."""
     expected = frozenset({"research", "critique"})
     assert middleware.SUPERVISOR_DELEGATION_TOOLS == expected
+
+
+# -- Stage-9d D9d.1: SaveReportGuardMiddleware's REVISE-path nudge --
+#
+# The stage-9c live run produced two cases whose `save_report` was refused by
+# `SaveReportVerdictGuardMiddleware` on a standing REVISE while rounds
+# remained, after which the Supervisor ended its turn conversationally
+# instead of re-entering the loop -- confirmed from those runs' own span
+# dumps, not inferred. The refusal string was the only thing pointing the
+# model back at `critique`; these tests pin a deterministic nudge instead.
+
+
+def _guard_state(
+    *,
+    verdict: str,
+    critique_ids: list[str],
+    research: bool = True,
+    saved_ok: bool = False,
+) -> dict[str, Any]:
+    messages: list[Any] = [HumanMessage("q")]
+    if research:
+        messages.append(_ai_with_calls("research", ids=["r0"]))
+        messages.append(
+            ToolMessage(content="findings", tool_call_id="r0", name="research")
+        )
+    if critique_ids:
+        messages.append(
+            _ai_with_calls(*["critique"] * len(critique_ids), ids=critique_ids)
+        )
+        messages.extend(
+            _tool_result(call_id, f"verdict {verdict}") for call_id in critique_ids
+        )
+    if saved_ok:
+        messages.append(_ai_with_calls("save_report", ids=["s0"]))
+        messages.append(
+            ToolMessage(content="saved to x.md", tool_call_id="s0", name="save_report")
+        )
+    return {"messages": messages, "verdict": verdict}
+
+
+def _nudge_probe(state: dict[str, Any], max_revisions: int = 2) -> list[Any]:
+    """Run the guard over a no-tool-call response, returning every request
+    the handler saw -- length 2 means the nudge fired."""
+    seen: list[Any] = []
+
+    def handler(request: ModelRequest[Any]) -> ModelResponse[Any]:
+        seen.append(request)
+        return ModelResponse(result=[AIMessage(content="I'll stop here.")])
+
+    guard = middleware.SaveReportGuardMiddleware(max_revisions=max_revisions)
+    guard.wrap_model_call(_model_request(state=state), handler)
+    return seen
+
+
+def test_save_report_guard_nudges_back_to_critique_on_revise_with_rounds_left() -> None:
+    seen = _nudge_probe(_guard_state(verdict="REVISE", critique_ids=["c0"]))
+    assert len(seen) == 2
+    appended = str(seen[1].messages[-1].content)
+    assert "critique" in appended
+
+
+def test_save_report_guard_nudges_to_save_on_revise_once_the_cap_is_exhausted() -> None:
+    seen = _nudge_probe(_guard_state(verdict="REVISE", critique_ids=["c0", "c1", "c2"]))
+    assert len(seen) == 2
+    appended = str(seen[1].messages[-1].content)
+    assert "save_report" in appended
+
+
+def test_save_report_guard_does_not_nudge_when_a_save_already_executed() -> None:
+    seen = _nudge_probe(
+        _guard_state(verdict="REVISE", critique_ids=["c0"], saved_ok=True)
+    )
+    assert len(seen) == 1
+
+
+def test_save_report_guard_never_nudges_a_run_that_never_reached_research() -> None:
+    """`_S1` rule 1a: an out-of-scope plan ends the run with a message and
+    no research. Nudging there would force a save on a refusal."""
+    seen = _nudge_probe(_guard_state(verdict="REVISE", critique_ids=[], research=False))
+    assert len(seen) == 1
+
+
+def test_save_report_guard_still_nudges_on_approve_unsaved() -> None:
+    seen = _nudge_probe(_guard_state(verdict="APPROVE", critique_ids=["c0"]))
+    assert len(seen) == 2
+    assert "save_report" in str(seen[1].messages[-1].content)
+
+
+@pytest.mark.asyncio
+async def test_save_report_guard_revise_nudge_has_an_async_variant() -> None:
+    seen: list[Any] = []
+
+    async def handler(request: ModelRequest[Any]) -> ModelResponse[Any]:
+        seen.append(request)
+        return ModelResponse(result=[AIMessage(content="I'll stop here.")])
+
+    guard = middleware.SaveReportGuardMiddleware(max_revisions=2)
+    await guard.awrap_model_call(
+        _model_request(state=_guard_state(verdict="REVISE", critique_ids=["c0"])),
+        handler,
+    )
+    assert len(seen) == 2
+    assert "critique" in str(seen[1].messages[-1].content)

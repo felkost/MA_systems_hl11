@@ -359,22 +359,55 @@ _SAVE_REPORT_NUDGE = (
     "with it now."
 )
 
+_REVISE_CONTINUE_NUDGE = (
+    "The verdict is REVISE and revision rounds still remain, so this run "
+    "has no report yet. Call research with the Critic's revision requests, "
+    "then critique the new findings. Do not end your turn here."
+)
+
+_REVISE_EXHAUSTED_NUDGE = (
+    "Revision rounds are exhausted and no report has been saved this run. "
+    "Compose the final Markdown report from the findings you already have "
+    "and call save_report with it now."
+)
+
 
 class SaveReportGuardMiddleware(
     AgentMiddleware[AgentState[ResponseT], ContextT, ResponseT]
 ):
-    """One-shot nudge toward `save_report` after an APPROVE the model is
-    about to leave unsaved.
+    """One-shot nudge back into the loop when the model is about to end a
+    turn that owes a report.
 
-    Fires only when **all four** hold on the model's about-to-end response:
-    it carries no tool calls, `state["verdict"] == "APPROVE"`, a `critique`
-    result exists since the most recent `HumanMessage` (not merely
-    `state["verdict"]`, which a checkpointed thread carries across
-    questions, the same trap `RoundStabilityMiddleware` guards against), and
-    no `save_report` call exists since that same boundary. **A standing
-    REVISE is never forced** -- a run that exhausted its revision budget has
-    no approved content, and forcing a save there would ship a report its
-    own Critic rejected.
+    Two paths, one re-request either way.
+
+    **APPROVE-unsaved.** Fires when the about-to-end response carries no
+    tool calls, `state["verdict"] == "APPROVE"`, a `critique` result exists
+    since the most recent `HumanMessage` (not merely `state["verdict"]`,
+    which a checkpointed thread carries across questions, the same trap
+    `RoundStabilityMiddleware` guards against), and no `save_report` call
+    exists since that same boundary.
+
+    **REVISE-stalled** (stage-9d D9d.1). Fires when the response carries no
+    tool calls, `research` has run since the most recent `HumanMessage`, no
+    *executed* `save_report` exists since that boundary, and the verdict is
+    not APPROVE. This path exists because a `save_report` refused by
+    `SaveReportVerdictGuardMiddleware` on a standing REVISE left the model
+    with nothing but the refusal string to act on, and two cases in the
+    stage-9c live run simply stopped there and answered the user in prose
+    -- read from those runs' own span dumps, where the refused
+    `tool.save_report` span sits beside an empty output directory.
+
+    The two paths differ in where they point, on the same cap arithmetic
+    the verdict guard uses (`emitted_critique_count`, shared, not
+    reimplemented): back to `research`/`critique` while rounds remain,
+    forward to `save_report` once they are spent. Neither path ever forces
+    a save while rounds remain -- that would ship a report the Critic
+    rejected, which is what the original "a standing REVISE is never
+    forced" rule protected against, and still does.
+
+    The executed-versus-emitted distinction is load-bearing here: an
+    emitted-but-refused `save_report` must not read as saved, or this
+    middleware goes silent on exactly the runs it exists for.
 
     One re-request with `tool_choice="any"`, whatever it returns. The
     Supervisor carries no `response_format`, so it is always on the
@@ -388,15 +421,20 @@ class SaveReportGuardMiddleware(
     `delegate_to_critic`.
     """
 
+    def __init__(self, max_revisions: int) -> None:
+        super().__init__()
+        self.max_revisions = max_revisions
+
     def wrap_model_call(
         self,
         request: ModelRequest[ContextT],
         handler: Callable[[ModelRequest[ContextT]], ModelResponse[ResponseT]],
     ) -> ModelResponse[ResponseT]:
         response = handler(request)
-        if not self._should_nudge(request, response):
+        nudge = self._nudge_for(request, response)
+        if nudge is None:
             return response
-        return handler(self._retry_request(request))
+        return handler(self._retry_request(request, nudge))
 
     async def awrap_model_call(
         self,
@@ -406,30 +444,51 @@ class SaveReportGuardMiddleware(
         ],
     ) -> ModelResponse[ResponseT]:
         response = await handler(request)
-        if not self._should_nudge(request, response):
+        nudge = self._nudge_for(request, response)
+        if nudge is None:
             return response
-        return await handler(self._retry_request(request))
+        return await handler(self._retry_request(request, nudge))
 
-    def _should_nudge(
+    def _nudge_for(
         self, request: ModelRequest[ContextT], response: ModelResponse[ResponseT]
-    ) -> bool:
+    ) -> str | None:
+        """Which nudge this about-to-end response earns, or `None`."""
         if self._has_tool_calls(response):
-            return False
-        if request.state.get("verdict") != "APPROVE":
-            return False
+            return None
+
         messages = cast("list[BaseMessage]", request.state["messages"])
-        if not _run_tool_call_ids(messages, "critique"):
-            return False
-        if _run_tool_call_ids(messages, "save_report"):
-            return False
-        return True
+        if self._has_executed_save_report(messages):
+            return None
+
+        if request.state.get("verdict") == "APPROVE":
+            if not _run_tool_call_ids(messages, "critique"):
+                return None
+            if _run_tool_call_ids(messages, "save_report"):
+                return None
+            return _SAVE_REPORT_NUDGE
+
+        if not _run_tool_call_ids(messages, "research"):
+            return None
+        if emitted_critique_count(messages) < self.max_revisions + 1:
+            return _REVISE_CONTINUE_NUDGE
+        return _REVISE_EXHAUSTED_NUDGE
 
     @staticmethod
-    def _retry_request(request: ModelRequest[ContextT]) -> ModelRequest[ContextT]:
-        retry_messages = [
-            *request.messages,
-            HumanMessage(content=_SAVE_REPORT_NUDGE),
-        ]
+    def _has_executed_save_report(messages: list[BaseMessage]) -> bool:
+        """A refused `save_report` wrote no file, so only a non-error result
+        counts -- the emitted-versus-executed distinction this middleware
+        exists to respect."""
+        call_ids = _run_tool_call_ids(messages, "save_report")
+        return any(
+            not result.startswith("ERROR:")
+            for result in _tool_results(messages, call_ids)
+        )
+
+    @staticmethod
+    def _retry_request(
+        request: ModelRequest[ContextT], nudge: str
+    ) -> ModelRequest[ContextT]:
+        retry_messages = [*request.messages, HumanMessage(content=nudge)]
         return request.override(messages=retry_messages, tool_choice="any")
 
     @staticmethod

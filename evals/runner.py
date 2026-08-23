@@ -277,6 +277,7 @@ def build_llm_test_case(
     agent_span_name: str | None = None,
     expected_output: str | None = None,
     expected_tools: list[ToolCall] | None = None,
+    name: str | None = None,
 ) -> LLMTestCase:
     """Compose one run's span dump into a DeepEval `LLMTestCase`.
 
@@ -297,6 +298,10 @@ def build_llm_test_case(
         Both left `None` when not supplied, never defaulted to an empty
         value: a metric reading `expected_tools` would treat `[]` as a real
         expectation rather than as "this caller is not measuring that".
+    name : str, optional
+        Carried into DeepEval's own persisted run file, which is otherwise
+        the only record of which test produced a case and has no source-file
+        field of its own (`evals/summarize_e2e.py`, D9d.8).
 
     Returns
     -------
@@ -309,6 +314,7 @@ def build_llm_test_case(
         retrieval_context_for_agent(run, agent_span_name)
     )
     return LLMTestCase(
+        name=name,
         input=input,
         actual_output=actual_output,
         expected_output=expected_output,

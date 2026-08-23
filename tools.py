@@ -26,9 +26,10 @@ from __future__ import annotations
 
 import ipaddress
 import re
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 from urllib.parse import urlparse
 
 import httpx
@@ -43,6 +44,9 @@ import paths
 from config import Settings, load_settings
 from middleware import truncate_for_span
 from retriever import IndexMismatchError, get_retriever
+
+_SEARCH_ATTEMPTS = 3
+_SEARCH_RETRY_INITIAL_DELAY_SECONDS = 1.0
 
 SearchResult = TypedDict(
     "SearchResult",
@@ -199,33 +203,54 @@ def web_search(query: str) -> list[SearchResult] | str:
     if not normalized_query:
         return "ERROR: Search query cannot be empty."
 
-    try:
-        settings = load_settings()
-        raw_results = DDGS().text(
-            normalized_query,
-            max_results=settings.max_search_results,
-        )
-        results: list[SearchResult] = []
-        seen_urls: set[str] = set()
-        for item in raw_results:
-            title = str(item.get("title") or "Untitled").strip()
-            url = str(item.get("href") or "").strip()
-            snippet = str(item.get("body") or "").strip()
-            if not url or url in seen_urls:
-                continue
-            seen_urls.add(url)
-            results.append(
-                {
-                    "title": title,
-                    "url": url,
-                    "snippet": snippet[: settings.max_search_snippet_length],
-                }
-            )
-        return results
-    except Exception:
+    settings = load_settings()
+    raw_results = _search_with_retry(
+        normalized_query, max_results=settings.max_search_results
+    )
+    if raw_results is None:
         # Exception text can contain DNS names and local paths, and it would
         # reach the model unchanged. Report the failure without the details.
         return "ERROR: Web search is temporarily unavailable."
+
+    results: list[SearchResult] = []
+    seen_urls: set[str] = set()
+    for item in raw_results:
+        title = str(item.get("title") or "Untitled").strip()
+        url = str(item.get("href") or "").strip()
+        snippet = str(item.get("body") or "").strip()
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        results.append(
+            {
+                "title": title,
+                "url": url,
+                "snippet": snippet[: settings.max_search_snippet_length],
+            }
+        )
+    return results
+
+
+def _search_with_retry(query: str, *, max_results: int) -> list[dict[str, Any]] | None:
+    """Call DuckDuckGo, retrying a transient failure; `None` once spent.
+
+    The retry lives here rather than in `ToolRetryMiddleware` because
+    `web_search` reports failure by *returning* a string: a returned value
+    is not an exception, so the middleware's `retry_on=(Exception,)` never
+    sees it and every rate-limit was one attempt and done. Measured across
+    two live evaluation runs before this was added -- 9 of 15 end-to-end
+    runs hit the unavailable-string in the stage-9a baseline alone.
+    """
+    delay = _SEARCH_RETRY_INITIAL_DELAY_SECONDS
+    for attempt in range(_SEARCH_ATTEMPTS):
+        try:
+            return list(DDGS().text(query, max_results=max_results))
+        except Exception:
+            if attempt == _SEARCH_ATTEMPTS - 1:
+                return None
+            time.sleep(delay)
+            delay *= 2
+    return None
 
 
 @tool

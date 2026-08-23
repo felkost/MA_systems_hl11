@@ -49,7 +49,10 @@ class OpenRouterModel(DeepEvalBaseLLM):
         model_name: str,
         api_key: str,
         base_url: str = _DEFAULT_BASE_URL,
-        timeout: float = 60.0,
+        # 120s, not 60: a judge call carrying a full saved report plus a
+        # full retrieval context timed out at 60 in each of the stage-9a and
+        # stage-9c live runs, erroring the metric rather than scoring it.
+        timeout: float = 120.0,
         # httpx.MockTransport implements both BaseTransport and
         # AsyncBaseTransport (httpx/_transports/mock.py); the union below
         # is what lets one test double satisfy both httpx.Client and

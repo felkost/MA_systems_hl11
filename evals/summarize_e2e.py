@@ -38,6 +38,20 @@ _E2E_METRIC_NAMES = frozenset(
 )
 _GOLDEN_DATASET_PATH = paths.PROJECT_ROOT / "tests" / "golden_dataset.json"
 
+# Which test file a persisted case came from, keyed by the metric that
+# scored it. DeepEval's own persisted case carries no source-file field
+# (measured, stage 9d), so metric identity is the only join available --
+# the same basis `filter_e2e_cases` already uses, extended to the four
+# non-e2e files so one `deepeval test run tests/` renders the brief's whole
+# five-file report (D9d.8).
+_FILE_BY_METRIC: dict[str, str] = {
+    "Plan Quality [GEval]": "tests/test_planner.py",
+    "Groundedness [GEval]": "tests/test_researcher.py",
+    "Critique Quality [GEval]": "tests/test_critic.py",
+    "Tool Correctness": "tests/test_tools.py",
+}
+_E2E_FILE = "tests/test_e2e.py"
+
 
 class UnknownCaseError(RuntimeError):
     """An e2e-scoped test case's name has no match in the golden dataset --
@@ -104,11 +118,61 @@ def _case_passed(case: dict[str, Any]) -> bool:
     return all(metric["success"] for metric in case["metricsData"])
 
 
+def group_component_cases(run: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Persisted cases from the four non-e2e test files, keyed by file.
+
+    A case whose metrics match none of `_FILE_BY_METRIC` and are not the
+    e2e trio is skipped rather than guessed at -- an unrecognised metric
+    means a new test file this renderer has not been taught about, and
+    inventing a heading for it would be worse than omitting it.
+    """
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for case in run.get("testCases", []):
+        metric_names = {metric["name"] for metric in case.get("metricsData", [])}
+        if metric_names == _E2E_METRIC_NAMES:
+            continue
+        files = {
+            _FILE_BY_METRIC[name] for name in metric_names if name in _FILE_BY_METRIC
+        }
+        if len(files) != 1:
+            continue
+        grouped.setdefault(files.pop(), []).append(case)
+    return grouped
+
+
+def _metric_line(metric: dict[str, Any]) -> str:
+    # A metric that errored (e.g. a judge-model timeout) carries no "score"
+    # at all -- DeepEval's own file dumps with `exclude_none=True`, so the
+    # key is absent, not `null` (measured against a real run, not assumed).
+    score = metric.get("score")
+    score_text = f"{score:.2f}" if score is not None else "ERRORED"
+    error = metric.get("error")
+    suffix = f" -- {error}" if error else ""
+    return (
+        f"     {metric['name']}: {score_text} "
+        f"(threshold {metric['threshold']:.2f}){suffix}"
+    )
+
+
+def render_component_sections(grouped: dict[str, list[dict[str, Any]]]) -> list[str]:
+    """The brief's own per-file blocks for the four non-e2e test files."""
+    lines: list[str] = []
+    for file_name in sorted(grouped):
+        lines.append(file_name)
+        for case in sorted(grouped[file_name], key=lambda c: str(c.get("name") or "")):
+            icon = "✅" if _case_passed(case) else "❌"
+            lines.append(f"  {icon} {case.get('name') or 'unnamed case'}")
+            lines.extend(_metric_line(metric) for metric in case["metricsData"])
+        lines.append("")
+    return lines
+
+
 def render_summary_markdown(
     cases: list[dict[str, Any]],
     *,
     case_costs: list[dict[str, Any]],
     total_cases: int,
+    component_groups: dict[str, list[dict[str, Any]]] | None = None,
 ) -> str:
     """The brief's own mockup shape, all three of I4's elements.
 
@@ -125,25 +189,20 @@ def render_summary_markdown(
         that already knows how many cases were *scored* (as opposed to
         skipped, e.g. the poisoned-knowledge-base case, D9a.12) states it
         plainly instead of this function guessing.
+    component_groups : dict, optional
+        `group_component_cases`'s output. Supplied when the invocation
+        covered the whole suite, so the report shows all five test files
+        rather than the e2e one alone (D9d.8).
     """
-    lines: list[str] = ["tests/test_e2e.py"]
+    lines: list[str] = []
+    if component_groups:
+        lines.extend(render_component_sections(component_groups))
+
+    lines.append(_E2E_FILE)
     for case in sorted(cases, key=lambda c: str(c["name"])):
         icon = "✅" if _case_passed(case) else "❌"
         lines.append(f"  {icon} test_golden_dataset[{case['name']}]")
-        for metric in case["metricsData"]:
-            # A metric that errored (e.g. a judge-model timeout) carries no
-            # "score" at all -- DeepEval's own file dumps with
-            # `exclude_none=True`, so the key is absent, not `null`
-            # (measured against a real run this stage's own live run
-            # produced, not assumed offline).
-            score = metric.get("score")
-            score_text = f"{score:.2f}" if score is not None else "ERRORED"
-            error = metric.get("error")
-            suffix = f" -- {error}" if error else ""
-            lines.append(
-                f"     {metric['name']}: {score_text} "
-                f"(threshold {metric['threshold']:.2f}){suffix}"
-            )
+        lines.extend(_metric_line(metric) for metric in case["metricsData"])
     lines.append("")
 
     lines.append("Aggregates:")
@@ -180,9 +239,15 @@ def render_summary_markdown(
     )
     lines.append("")
 
-    passed_overall = sum(1 for case in cases if _case_passed(case))
-    pass_rate = (passed_overall / total_cases * 100) if total_cases else 0.0
-    lines.append(f"Overall: {passed_overall}/{total_cases} passed ({pass_rate:.1f}%)")
+    component_cases = [
+        case for group in (component_groups or {}).values() for case in group
+    ]
+    passed_overall = sum(1 for case in [*cases, *component_cases] if _case_passed(case))
+    scored_overall = total_cases + len(component_cases)
+    pass_rate = (passed_overall / scored_overall * 100) if scored_overall else 0.0
+    lines.append(
+        f"Overall: {passed_overall}/{scored_overall} passed ({pass_rate:.1f}%)"
+    )
 
     return "\n".join(lines) + "\n"
 
@@ -228,15 +293,26 @@ def main(eval_run_id: str | None = None) -> Path:
 
     run = load_latest_run()
     cases = filter_e2e_cases(run, category_by_id=_category_by_id())
+    component_groups = group_component_cases(run)
     case_costs = load_case_costs(eval_run_id)
 
     run_dir = paths.run_dir(eval_run_id)
     (run_dir / "eval-results.json").write_text(
-        json.dumps({"cases": cases, "case_costs": case_costs}, indent=2),
+        json.dumps(
+            {
+                "cases": cases,
+                "component_cases": component_groups,
+                "case_costs": case_costs,
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
     summary = render_summary_markdown(
-        cases, case_costs=case_costs, total_cases=len(cases)
+        cases,
+        case_costs=case_costs,
+        total_cases=len(cases),
+        component_groups=component_groups,
     )
     (run_dir / "summary.md").write_text(summary, encoding="utf-8")
     return run_dir

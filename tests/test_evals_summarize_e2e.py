@@ -14,6 +14,7 @@ import pytest
 from evals.summarize_e2e import (
     UnknownCaseError,
     filter_e2e_cases,
+    group_component_cases,
     render_summary_markdown,
 )
 
@@ -175,3 +176,72 @@ def test_render_summary_markdown_handles_an_errored_metric_with_no_score() -> No
     # Aggregates for Answer Relevancy must not include a phantom score from
     # the errored entry (there were no other Answer Relevancy scores here).
     assert "Answer Relevancy: avg" not in markdown
+
+
+# -- Stage-9d D9d.8: the report covers all five test files, not e2e alone --
+
+
+def _five_file_run() -> dict:
+    run = _fake_full_run()
+    run["testCases"].extend(
+        [
+            {
+                "name": "test_research_grounded[core-agent-persona]",
+                "metricsData": [_metric("Groundedness [GEval]", 0.45, 0.7, False)],
+            },
+            {
+                "name": "test_critique_approve",
+                "metricsData": [_metric("Critique Quality [GEval]", 0.92, 0.7, True)],
+            },
+            {
+                "name": "test_planner_tools",
+                "metricsData": [_metric("Tool Correctness", 1.0, 0.5, True)],
+            },
+        ]
+    )
+    return run
+
+
+def test_group_component_cases_keys_each_case_by_its_source_test_file() -> None:
+    grouped = group_component_cases(_five_file_run())
+    assert set(grouped) == {
+        "tests/test_planner.py",
+        "tests/test_researcher.py",
+        "tests/test_critic.py",
+        "tests/test_tools.py",
+    }
+    assert [c["name"] for c in grouped["tests/test_tools.py"]] == ["test_planner_tools"]
+
+
+def test_render_summary_markdown_shows_every_test_file_with_its_own_lines() -> None:
+    run = _five_file_run()
+    cases = filter_e2e_cases(run, category_by_id=_CATEGORY_BY_ID)
+    summary = render_summary_markdown(
+        cases,
+        case_costs=[],
+        total_cases=len(cases),
+        component_groups=group_component_cases(run),
+    )
+    for file_name in (
+        "tests/test_planner.py",
+        "tests/test_researcher.py",
+        "tests/test_critic.py",
+        "tests/test_tools.py",
+        "tests/test_e2e.py",
+    ):
+        assert file_name in summary
+    assert "test_critique_approve" in summary
+    assert "Critique Quality [GEval]: 0.92 (threshold 0.70)" in summary
+    # 6 scored cases -- 2 e2e plus 4 component (the base fixture already
+    # carries one Plan Quality case). One e2e and one component case fail.
+    assert "Overall: 4/6 passed (66.7%)" in summary
+
+
+def test_render_summary_markdown_without_component_groups_is_e2e_only() -> None:
+    """The stage-9a shape stays available: a run over `tests/test_e2e.py`
+    alone must not sprout empty headings for files it never collected."""
+    run = _fake_full_run()
+    cases = filter_e2e_cases(run, category_by_id=_CATEGORY_BY_ID)
+    summary = render_summary_markdown(cases, case_costs=[], total_cases=len(cases))
+    assert "tests/test_planner.py" not in summary
+    assert summary.startswith("tests/test_e2e.py")
