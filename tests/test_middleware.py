@@ -252,6 +252,86 @@ def test_tracing_middleware_records_token_usage_and_cost_on_model_call() -> None
         otel_trace._TRACER_PROVIDER_SET_ONCE = Once()
 
 
+# -- Stage 9e, phase 3 R.2: a retry inside `wrap_model_call` must not erase
+# the discarded call's own token usage. `TracingMiddleware`'s own
+# `model.<role>` span wraps the *composed* `handler()` call, so when an
+# inner middleware (`CriticVerificationMiddleware`, `SaveReportGuardMiddleware`,
+# `grounding.UnsupportedClaimMiddleware`) retries by calling `handler()` a
+# second time, `TracingMiddleware` only ever sees the final response --
+# verified offline this stage with exactly this nesting (`TracingMiddleware`
+# outer, a one-shot retry middleware inner, a fake model returning two
+# distinct `usage_metadata` payloads), producing one `model.<role>` span
+# carrying only the second call's counts (`docs/specs/stage-9e.md`'s dated
+# R.2 line, "phase 3, H3a/H3b/H3c probes run"). The fix: the retrying
+# middleware itself records the first (discarded) response's usage via
+# `middleware.record_superseded_model_call` before retrying, so the two
+# real calls together produce two spans.
+
+
+def test_critic_verification_retry_does_not_lose_the_first_calls_token_usage() -> None:
+    from types import SimpleNamespace
+
+    from langchain_core.messages.ai import UsageMetadata
+    from opentelemetry import trace as otel_trace
+
+    provider, exporter = _recording_provider()
+    otel_trace.set_tracer_provider(provider)
+    try:
+        first_response = AIMessage(
+            content="no verification call",
+            usage_metadata=UsageMetadata(
+                input_tokens=100, output_tokens=50, total_tokens=150
+            ),
+        )
+        second_response = AIMessage(
+            content="",
+            tool_calls=[{"name": "web_search", "args": {"query": "x"}, "id": "c1"}],
+            usage_metadata=UsageMetadata(
+                input_tokens=200, output_tokens=80, total_tokens=280
+            ),
+        )
+        scripted = iter([first_response, second_response])
+        calls = 0
+
+        def inner_handler(request: ModelRequest[Any]) -> ModelResponse[Any]:
+            nonlocal calls
+            calls += 1
+            return ModelResponse(result=[next(scripted)])
+
+        request = _model_request(
+            model=SimpleNamespace(model_name="openai/gpt-4.1-mini"),
+        )
+        critic = middleware.CriticVerificationMiddleware()
+
+        def traced_handler(r: ModelRequest[Any]) -> ModelResponse[Any]:
+            return critic.wrap_model_call(r, inner_handler)
+
+        middleware.TracingMiddleware(role="critic").wrap_model_call(
+            request, traced_handler
+        )
+
+        assert calls == 2  # both real, billed model calls happened
+
+        model_spans = [
+            s for s in exporter.get_finished_spans() if s.name == "model.critic"
+        ]
+        total_input = sum(
+            s.attributes["gen_ai.usage.input_tokens"] for s in model_spans
+        )
+        total_output = sum(
+            s.attributes["gen_ai.usage.output_tokens"] for s in model_spans
+        )
+        # Both calls' tokens must be accounted for, not just the second
+        # (retried) call's -- 100+200 input, 50+80 output.
+        assert total_input == 300
+        assert total_output == 130
+    finally:
+        otel_trace._TRACER_PROVIDER = None
+        from opentelemetry.util._once import Once
+
+        otel_trace._TRACER_PROVIDER_SET_ONCE = Once()
+
+
 def test_tracing_middleware_serializes_tool_args_to_a_json_string_not_a_raw_dict() -> (
     None
 ):

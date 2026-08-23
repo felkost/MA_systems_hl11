@@ -30,6 +30,18 @@ from grounding import UnsupportedClaimMiddleware, extract_candidates
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 
+def _token_attribute(span: Any, name: str) -> int:
+    """One integer span attribute, narrowed for mypy.
+
+    `ReadableSpan.attributes` is `Mapping[str, <wide union>] | None`, so
+    neither the subscript nor the arithmetic below type-checks without
+    stating what this project itself always writes there
+    (`TracingMiddleware._record_usage`: a plain int).
+    """
+    assert span.attributes is not None
+    return int(span.attributes[name])
+
+
 def _fixture_text(name: str) -> str:
     return (_FIXTURES_DIR / name).read_text(encoding="utf-8")
 
@@ -247,6 +259,89 @@ def test_cap_stops_nudging_once_the_run_scoped_limit_is_reached() -> None:
 
     assert calls == 1  # no retry once the cap is already reached
     assert not isinstance(result, ExtendedModelResponse)
+
+
+# -- Stage 9e, phase 3 R.2: same shape as CriticVerificationMiddleware's own
+# regression in tests/test_middleware.py -- the grounding nudge's discarded
+# first response must still get its own `model.<role>` span.
+
+
+def test_grounding_nudge_retry_does_not_lose_the_first_calls_token_usage() -> None:
+    from types import SimpleNamespace
+
+    from langchain_core.messages.ai import UsageMetadata
+    from opentelemetry import trace as otel_trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+        InMemorySpanExporter,
+    )
+    from opentelemetry.util._once import Once
+
+    import middleware
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    otel_trace.set_tracer_provider(provider)
+    try:
+        first_response = AIMessage(
+            content="The AG2 framework handles this.",
+            usage_metadata=UsageMetadata(
+                input_tokens=100, output_tokens=50, total_tokens=150
+            ),
+        )
+        second_response = AIMessage(
+            content="Removed the unverified claim.",
+            usage_metadata=UsageMetadata(
+                input_tokens=200, output_tokens=80, total_tokens=280
+            ),
+        )
+        scripted = iter([first_response, second_response])
+        calls = 0
+
+        def inner_handler(request: ModelRequest[Any]) -> ModelResponse[Any]:
+            nonlocal calls
+            calls += 1
+            return ModelResponse(result=[next(scripted)])
+
+        request = _model_request(
+            model=SimpleNamespace(model_name="openai/gpt-4.1-mini"),
+        )
+        nudger = UnsupportedClaimMiddleware()
+
+        def traced_handler(r: ModelRequest[Any]) -> ModelResponse[Any]:
+            # Mirrors langchain's own `_chain_model_call_handlers` inner
+            # wrapper (`factory.py`'s `inner_handler`): an
+            # `ExtendedModelResponse` is always unwrapped to its plain
+            # `ModelResponse` before an outer middleware's own `handler()`
+            # call returns it -- `TracingMiddleware` never sees the wrapper
+            # type in the real composed graph.
+            result = nudger.wrap_model_call(r, inner_handler)
+            if isinstance(result, ExtendedModelResponse):
+                return result.model_response
+            return result
+
+        middleware.TracingMiddleware(role="researcher").wrap_model_call(
+            request, traced_handler
+        )
+
+        assert calls == 2  # both real, billed model calls happened
+
+        model_spans = [
+            s for s in exporter.get_finished_spans() if s.name == "model.researcher"
+        ]
+        total_input = sum(
+            _token_attribute(s, "gen_ai.usage.input_tokens") for s in model_spans
+        )
+        total_output = sum(
+            _token_attribute(s, "gen_ai.usage.output_tokens") for s in model_spans
+        )
+        assert total_input == 300
+        assert total_output == 130
+    finally:
+        otel_trace._TRACER_PROVIDER = None
+        otel_trace._TRACER_PROVIDER_SET_ONCE = Once()
 
 
 @pytest.mark.asyncio

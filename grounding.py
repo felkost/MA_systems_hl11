@@ -46,7 +46,12 @@ from langgraph.channels.untracked_value import UntrackedValue
 from langgraph.types import Command
 from typing_extensions import NotRequired
 
-from middleware import _VERIFICATION_TOOLS, _run_tool_call_ids, _tool_results
+from middleware import (
+    _VERIFICATION_TOOLS,
+    _run_tool_call_ids,
+    _tool_results,
+    record_superseded_model_call,
+)
 
 _FENCED_CODE_BLOCK = re.compile(r"```.*?```", re.DOTALL)
 _HEADING_LINE = re.compile(r"^#{1,6}\s.*$", re.MULTILINE)
@@ -236,9 +241,21 @@ class UnsupportedClaimMiddleware(
     the nudge asks for a redraft, not a tool call.
 
     Defines **both** `wrap_model_call` and `awrap_model_call` (D3.1b).
+
+    `role`, default `"researcher"` -- the only role this middleware is ever
+    attached to (`orchestrator.py`/`supervisor.py`'s `research_graph`),
+    passed to `middleware.record_superseded_model_call` so a grounding
+    nudge's discarded first response still gets its own `model.<role>` span
+    (stage 9e, phase 3 R.2 finding, found while verifying this middleware's
+    own retry: `TracingMiddleware`'s own span otherwise sees only the
+    redrafted response).
     """
 
     state_schema = GroundingState  # type: ignore[assignment]
+
+    def __init__(self, *, role: str = "researcher") -> None:
+        super().__init__()
+        self.role = role
 
     def wrap_model_call(
         self,
@@ -249,6 +266,7 @@ class UnsupportedClaimMiddleware(
         nudge = self._nudge_for(request, response)
         if nudge is None:
             return response
+        record_superseded_model_call(self.role, request, response)
         retried = handler(self._retry_request(request, nudge))
         return self._extend(request, retried)
 
@@ -263,6 +281,7 @@ class UnsupportedClaimMiddleware(
         nudge = self._nudge_for(request, response)
         if nudge is None:
             return response
+        record_superseded_model_call(self.role, request, response)
         retried = await handler(self._retry_request(request, nudge))
         return self._extend(request, retried)
 
