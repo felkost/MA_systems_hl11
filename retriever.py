@@ -67,6 +67,17 @@ def _build_reranker(
     `top_n`, then returns plain `Document` objects -- the score itself is
     discarded. `knowledge_search` needs that number to tell the model when
     even the best match is weak.
+
+    `get_retriever`'s `lru_cache` means every `knowledge_search` call in a
+    process shares this one cross-encoder instance. `.score()` runs a
+    PyTorch forward pass on it, and two of LangGraph's own tool calls can
+    run concurrently on separate threads (`ToolNode` executes a multi-call
+    `AIMessage`'s tool calls in a thread pool) -- measured live, stage 9c,
+    as a Windows access violation inside `torch`/`transformers` when two
+    `knowledge_search` calls scored on the shared model at the same time.
+    `_retriever_lock` already exists for `get_retriever`'s own one-time
+    build; reused here to serialize scoring calls too, since the crash
+    site is inference, not construction.
     """
     from langchain_classic.retrievers.document_compressors import (
         CrossEncoderReranker,
@@ -79,9 +90,10 @@ def _build_reranker(
             query: str,
             callbacks: Callbacks | None = None,
         ) -> Sequence[Document]:
-            scores = self.model.score(
-                [(query, document.page_content) for document in documents]
-            )
+            with _retriever_lock:
+                scores = self.model.score(
+                    [(query, document.page_content) for document in documents]
+                )
             ranked = sorted(
                 zip(documents, scores, strict=True),
                 key=lambda pair: pair[1],

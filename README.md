@@ -8,22 +8,25 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 9a of 10 (E2E baseline) complete.** The RAG foundation
-> (stage 2), the three sub-agents (stage 3), both coordination paths —
-> the agent-as-tool Supervisor and the explicit `StateGraph` — with the
-> REPL that drives either one (stage 4), observability (stage 5,
+> **Status: stage 9c of 10 (fix, re-measure, thresholds) complete.** The RAG
+> foundation (stage 2), the three sub-agents (stage 3), both coordination
+> paths — the agent-as-tool Supervisor and the explicit `StateGraph` — with
+> the REPL that drives either one (stage 4), observability (stage 5,
 > OpenTelemetry + optional Langfuse Cloud + offline span dumps), the
-> 15-case golden dataset (stage 6), the three component metrics
-> (stage 7) and tool-correctness (stage 8) are all built and run for real.
-> `python main.py` reaches a human-in-the-loop gate before it ever writes a
-> report. This stage adds the **end-to-end evaluation**: `test_golden_dataset`
-> runs all 15 cases through the full Supervisor → Planner → Researcher →
-> Critic pipeline, scored by three metrics — `AnswerRelevancyMetric`,
-> a Correctness `GEval`, and **Citation Presence**, a custom `GEval`
-> checking whether every factual claim in the *saved report* carries a
-> citation to a source the run actually retrieved rather than recalled.
-> Error analysis and threshold revision (stages 9b/9c) are next. Sections
-> marked *(planned)* below describe what is coming, not what runs today.
+> 15-case golden dataset (stage 6), the three component metrics (stage 7),
+> tool-correctness (stage 8), and an end-to-end baseline (stage 9a,
+> 6/14 scored cases passing) are all built and run for real. Stage 9b read
+> every failing trace and classified the failures into
+> `docs/error-taxonomy.md`. Stage 9c fixed the largest system-defect
+> category with a revised Researcher prompt and re-measured: the fix did
+> **not** demonstrate the improvement it targeted (both cases it aimed at
+> stayed unchanged or slightly worse), and the author kept the new prompt
+> version anyway since the apparent aggregate regression is not
+> statistically distinguishable from noise at n=1. Two real infrastructure
+> defects surfaced and were fixed along the way — a genuine race condition
+> in the retrieval reranker, and a Windows console encoding issue in the
+> eval tooling — neither related to the prompt change itself. Only
+> documentation (final report, diagram set) remains for stage 10.
 
 ## Architecture
 
@@ -241,6 +244,54 @@ Citation Presence checks a web citation only by confirming a web tool was
 called, never what it returned; `Settings.critic_prompt_version` (`c2`) is
 stricter than the brief's own Critique Quality permits, so more revision
 rounds than the brief's looser reading requires remain a live possibility.
+
+### Error analysis and fix — stages 9b/9c
+
+Stage 9b read every stage-9a failing trace individually — not just the
+score — and classified all 8 failures into named categories with a count,
+a hypothesis and a cheapest plausible fix each. The largest system-defect
+category, "correct retrieval, wrong generation" (2 of 8 — the Researcher
+elaborating past what its own retrieved context supports), became stage
+9c's one fix: a new Researcher prompt version (`r2`, now the default) that
+says plainly when source material does not support a claim, instead of
+inventing an answer.
+
+```
+Re-measured, same 15-case dataset, same three metrics, same evals/runner.py:
+
+edge-narrow-memory-question   Correctness  0.0 (r1) -> 0.0 (r2)   unchanged
+edge-mixed-corpus-and-web     Correctness  0.4 (r1) -> 0.3 (r2)   worse
+
+Overall: 6/14 (r1, stage 9a) -> 5/14 (r2, this run)
+```
+
+**The fix did not demonstrate the improvement it targeted.** Per the
+stage's own honesty rule, written into its spec before the run: this
+result supports "the fix did not work on the two cases it targeted," not
+"the fix made the system worse" — most of the aggregate pass-rate move is
+judged to be ordinary run-to-run sampling variance at n=1, not a
+demonstrated regression. The author's decision, given a genuinely
+inconclusive result either way: keep `r2` as the default anyway, since the
+instruction is reasonable on its own terms and reverting on unproven noise
+would itself be an unjustified reaction. `r1` stays registered for
+comparison. Full case-by-case detail: `docs/error-taxonomy.md`.
+
+Two real infrastructure defects surfaced during stage 9c's own
+re-measurement, neither related to the prompt change, both fixed within
+the stage: a genuine, previously-unhit race condition in the retrieval
+reranker (two concurrent tool calls scoring the same shared cross-encoder
+model crashed the process with a native Windows access violation — fixed
+by extending an existing lock to also cover the scoring call, not just
+construction), and a Windows-console emoji-encoding crash in the eval
+tooling itself (fixed by setting `PYTHONIOENCODING=utf-8` for the
+invocation — no project code changed).
+
+A new, unresolved finding surfaced by this stage's own re-run: two cases
+produced a saved "report" that was actually Supervisor/Critic
+conversational text, not a report body — suggesting the Supervisor
+prompt's own rule against ending a turn with a summary instead of calling
+`save_report` did not hold on this run. Flagged as a candidate new error
+category, not investigated further this stage.
 
 ### How to read the numbers
 
