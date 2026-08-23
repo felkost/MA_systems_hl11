@@ -8,25 +8,36 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 9c of 10 (fix, re-measure, thresholds) complete.** The RAG
-> foundation (stage 2), the three sub-agents (stage 3), both coordination
-> paths — the agent-as-tool Supervisor and the explicit `StateGraph` — with
-> the REPL that drives either one (stage 4), observability (stage 5,
-> OpenTelemetry + optional Langfuse Cloud + offline span dumps), the
-> 15-case golden dataset (stage 6), the three component metrics (stage 7),
-> tool-correctness (stage 8), and an end-to-end baseline (stage 9a,
-> 6/14 scored cases passing) are all built and run for real. Stage 9b read
-> every failing trace and classified the failures into
-> `docs/error-taxonomy.md`. Stage 9c fixed the largest system-defect
-> category with a revised Researcher prompt and re-measured: the fix did
-> **not** demonstrate the improvement it targeted (both cases it aimed at
-> stayed unchanged or slightly worse), and the author kept the new prompt
-> version anyway since the apparent aggregate regression is not
-> statistically distinguishable from noise at n=1. Two real infrastructure
-> defects surfaced and were fixed along the way — a genuine race condition
-> in the retrieval reranker, and a Windows console encoding issue in the
-> eval tooling — neither related to the prompt change itself. Only
-> documentation (final report, diagram set) remains for stage 10.
+> **Status: stage 9d of 10 (return-to-loop guard, second fix iteration)
+> complete.** The RAG foundation (stage 2), the three sub-agents (stage 3),
+> both coordination paths — the agent-as-tool Supervisor and the explicit
+> `StateGraph` — with the REPL that drives either one (stage 4),
+> observability (stage 5, OpenTelemetry + optional Langfuse Cloud + offline
+> span dumps), the 15-case golden dataset (stage 6), the three component
+> metrics (stage 7), tool-correctness (stage 8), and an end-to-end baseline
+> (stage 9a, 6/14 scored cases passing) are all built and run for real.
+> Stage 9b read every failing trace and classified the failures into
+> `docs/error-taxonomy.md`. Stage 9c's own fix (a revised Researcher
+> prompt) did not demonstrate the improvement it targeted, kept anyway
+> since the apparent regression was not distinguishable from noise at n=1
+> — but its live run left one thing unresolved: two cases whose saved
+> "report" was actually Supervisor/Critic chat text. Stage 9d diagnosed
+> that from the real span dumps (a `save_report` refused on a standing
+> REVISE, with nothing pushing the model back into the loop afterward) and
+> fixed it with a deterministic middleware nudge — proven from spans and
+> files on disk, not inferred from a score: both diagnosed cases now
+> execute `save_report` for real. Pass rate moved 5/14 → 8/14, reported
+> without over-claiming (three of the eight passes are unrelated to this
+> stage's own changes, and one previously solid case regressed for an
+> unrelated reason). Running the brief's literal `deepeval test run
+> tests/` for the first time surfaced a new, still-unexplained
+> infrastructure defect — the offline tracer stopped recording
+> mid-session — recovered with a second, separate invocation, the same
+> configuration stages 7/8 always used. Two real infrastructure defects
+> from stage 9c were also fixed along the way (a retrieval-reranker race
+> condition, a Windows console encoding issue), neither related to any
+> prompt. Full detail: `docs/reports/stage-9d.md`. Only documentation
+> (final report, diagram set) remains for stage 10.
 
 ## Architecture
 
@@ -245,7 +256,7 @@ called, never what it returned; `Settings.critic_prompt_version` (`c2`) is
 stricter than the brief's own Critique Quality permits, so more revision
 rounds than the brief's looser reading requires remain a live possibility.
 
-### Error analysis and fix — stages 9b/9c
+### Error analysis and fix — stages 9b/9c/9d
 
 Stage 9b read every stage-9a failing trace individually — not just the
 score — and classified all 8 failures into named categories with a count,
@@ -292,6 +303,45 @@ conversational text, not a report body — suggesting the Supervisor
 prompt's own rule against ending a turn with a summary instead of calling
 `save_report` did not hold on this run. Flagged as a candidate new error
 category, not investigated further this stage.
+
+**Stage 9d diagnosed that finding from the real span dumps and fixed it.**
+`save_report` had been called and correctly refused
+(`SaveReportVerdictGuardMiddleware`, a standing REVISE with rounds still
+remaining) — but nothing deterministic pushed the Supervisor back into the
+loop afterward, so it sometimes ended its turn with prose instead. Fixed
+with a second nudge path in `SaveReportGuardMiddleware`: re-prompt toward
+`critique` while rounds remain, toward `save_report` once the cap is
+exhausted — the same cap arithmetic the verdict guard already uses.
+
+```
+Both stage-9c cases, checked directly against their own spans and files:
+
+core-agent-vs-rag-boundary   save_report: status=error, refused (9c)
+                              -> status=OK, 7174-byte report on disk (9d)
+edge-mixed-corpus-and-web    save_report: status=error, refused x2 (9c)
+                              -> status=OK, 3328-byte report on disk (9d)
+
+Overall: 6/14 (9a) -> 5/14 (9c) -> 8/14 (9d)
+```
+
+**The mechanism claim is proven** — a span plus a file, not a score.
+`edge-mixed-corpus-and-web` still fails `Correctness` in 9d, but now for
+its *original* reason (`r2`'s own unfixed fabrication), unmasked for the
+first time now that the coordination defect is gone. The aggregate move to
+8/14 is reported, not claimed as proven improvement: three of the eight
+passes are unrelated to this stage's changes, and one previously-solid
+case (`failure-nonsense-query`) regressed for an unrelated reason. Full
+per-case detail: `docs/error-taxonomy.md`.
+
+Running the brief's own literal `deepeval test run tests/` — all five
+files, one invocation, attempted for the first time this stage — completed
+without crashing but surfaced a new infrastructure defect: the offline
+span-dump tracer stopped recording partway through the session (every run
+before 06:27:27 has real spans, every one after has an empty directory,
+with no export warning, exception or double-configure error to explain
+it). The exact trigger stays unpinned rather than guessed at; the 7 live
+cases it cost were recovered in a second, separate invocation of just
+those three files — the configuration stages 7 and 8 always used.
 
 ### How to read the numbers
 

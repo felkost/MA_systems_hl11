@@ -59,22 +59,22 @@ def _critique_quality_metric(model: DeepEvalBaseLLM) -> GEval:
     )
 
 
-def _run_case(fixture_name: str, live_settings: Settings) -> None:
+def _run_case(fixture_name: str, live_settings: Settings, *, test_name: str) -> None:
     skip_without_index()
     findings = fixture_text(fixture_name)
     rendered_input = RESEARCH_INPUT_TEMPLATE.format(
         request=_ORIGINAL_REQUEST, task=findings
     )
     live = run_agent_live("critic", rendered_input, settings=live_settings)
-    case = LLMTestCase(input=findings, actual_output=live.output)
+    case = LLMTestCase(name=test_name, input=findings, actual_output=live.output)
     assert case.actual_output, f"{fixture_name}: critic produced no output"
     metrics: list[BaseMetric] = [_critique_quality_metric(judge_model(live_settings))]
     assert_test(case, metrics)
 
 
 def test_critique_approve(live_settings: Settings) -> None:
-    _run_case("findings_strong.md", live_settings)
+    _run_case("findings_strong.md", live_settings, test_name="test_critique_approve")
 
 
 def test_critique_revise(live_settings: Settings) -> None:
-    _run_case("findings_thin.md", live_settings)
+    _run_case("findings_thin.md", live_settings, test_name="test_critique_revise")

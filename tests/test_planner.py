@@ -43,11 +43,16 @@ def _plan_quality_metric(model: DeepEvalBaseLLM) -> GEval:
     )
 
 
-def _run_case(case_id: str, live_settings: Settings) -> None:
+def _run_case(case_id: str, live_settings: Settings, *, test_name: str) -> None:
     skip_without_index()
     agent_input = golden_input(case_id)
     live = run_agent_live("planner", agent_input, settings=live_settings)
-    case = LLMTestCase(input=agent_input, actual_output=live.output)
+    # `name` is what `evals/summarize_e2e.py` prints as this line's test id
+    # (D9d.8); without it DeepEval's persisted file carries no way back to
+    # the test that produced the case.
+    case = LLMTestCase(
+        name=f"{test_name}[{case_id}]", input=agent_input, actual_output=live.output
+    )
     assert case.actual_output, f"{case_id}: planner produced no output"
     metrics: list[BaseMetric] = [_plan_quality_metric(judge_model(live_settings))]
     assert_test(case, metrics)
@@ -57,11 +62,11 @@ def _run_case(case_id: str, live_settings: Settings) -> None:
     "case_id", ["core-single-vs-multi-agent", "core-agent-persona"]
 )
 def test_plan_quality(case_id: str, live_settings: Settings) -> None:
-    _run_case(case_id, live_settings)
+    _run_case(case_id, live_settings, test_name="test_plan_quality")
 
 
 @pytest.mark.parametrize(
     "case_id", ["core-tool-calling-role", "core-agent-vs-rag-boundary"]
 )
 def test_plan_has_queries(case_id: str, live_settings: Settings) -> None:
-    _run_case(case_id, live_settings)
+    _run_case(case_id, live_settings, test_name="test_plan_has_queries")

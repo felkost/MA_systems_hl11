@@ -264,7 +264,7 @@ def _supervisor_middleware(settings: Settings) -> list[Any]:
             role="supervisor",
         ),
         RoundStabilityMiddleware(),
-        SaveReportGuardMiddleware(),
+        SaveReportGuardMiddleware(max_revisions=settings.max_revisions),
         RevisionCapMiddleware(max_revisions=settings.max_revisions),
         SaveReportVerdictGuardMiddleware(max_revisions=settings.max_revisions),
     ]

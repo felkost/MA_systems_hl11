@@ -61,7 +61,7 @@ def _groundedness_metric(model: DeepEvalBaseLLM) -> GEval:
     )
 
 
-def _run_case(case_id: str, live_settings: Settings) -> None:
+def _run_case(case_id: str, live_settings: Settings, *, test_name: str) -> None:
     skip_without_index()
     request = golden_input(case_id)
     rendered_input = RESEARCH_INPUT_TEMPLATE.format(request=request, task=request)
@@ -85,7 +85,10 @@ def _run_case(case_id: str, live_settings: Settings) -> None:
     # local rather than passed as the narrower `list[str]` directly.
     typed_retrieval_context: list[str | RetrievedContextData] = list(retrieval_context)
     case = LLMTestCase(
-        input="", actual_output=live.output, retrieval_context=typed_retrieval_context
+        name=f"{test_name}[{case_id}]",
+        input="",
+        actual_output=live.output,
+        retrieval_context=typed_retrieval_context,
     )
     assert case.actual_output, f"{case_id}: researcher produced no output"
     metrics: list[BaseMetric] = [_groundedness_metric(judge_model(live_settings))]
@@ -96,9 +99,9 @@ def _run_case(case_id: str, live_settings: Settings) -> None:
     "case_id", ["core-single-vs-multi-agent", "core-agent-persona"]
 )
 def test_research_grounded(case_id: str, live_settings: Settings) -> None:
-    _run_case(case_id, live_settings)
+    _run_case(case_id, live_settings, test_name="test_research_grounded")
 
 
 @pytest.mark.parametrize("case_id", ["edge-narrow-memory-question"])
 def test_research_edge_case(case_id: str, live_settings: Settings) -> None:
-    _run_case(case_id, live_settings)
+    _run_case(case_id, live_settings, test_name="test_research_edge_case")

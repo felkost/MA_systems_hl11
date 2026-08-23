@@ -99,3 +99,12 @@ def test_get_model_name_returns_the_configured_id() -> None:
     model = OpenRouterModel(model_name="openai/gpt-4.1-mini", api_key="test-key")
 
     assert model.get_model_name() == "openai/gpt-4.1-mini"
+
+
+def test_default_timeout_is_generous_enough_for_a_full_report_judge_call() -> None:
+    """Stage 9d D9d.4. A judge call carrying a saved report plus a full
+    retrieval context errored on a 60s timeout in each of the two prior live
+    runs -- an errored metric carries no score at all, so the case is lost,
+    not merely slow."""
+    model = OpenRouterModel("openai/gpt-4.1-mini", api_key="k")
+    assert model._timeout == 120.0
