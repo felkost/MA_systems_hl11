@@ -8,36 +8,33 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 9d of 10 (return-to-loop guard, second fix iteration)
-> complete.** The RAG foundation (stage 2), the three sub-agents (stage 3),
-> both coordination paths — the agent-as-tool Supervisor and the explicit
-> `StateGraph` — with the REPL that drives either one (stage 4),
-> observability (stage 5, OpenTelemetry + optional Langfuse Cloud + offline
-> span dumps), the 15-case golden dataset (stage 6), the three component
-> metrics (stage 7), tool-correctness (stage 8), and an end-to-end baseline
-> (stage 9a, 6/14 scored cases passing) are all built and run for real.
-> Stage 9b read every failing trace and classified the failures into
-> `docs/error-taxonomy.md`. Stage 9c's own fix (a revised Researcher
-> prompt) did not demonstrate the improvement it targeted, kept anyway
-> since the apparent regression was not distinguishable from noise at n=1
-> — but its live run left one thing unresolved: two cases whose saved
-> "report" was actually Supervisor/Critic chat text. Stage 9d diagnosed
-> that from the real span dumps (a `save_report` refused on a standing
-> REVISE, with nothing pushing the model back into the loop afterward) and
-> fixed it with a deterministic middleware nudge — proven from spans and
-> files on disk, not inferred from a score: both diagnosed cases now
-> execute `save_report` for real. Pass rate moved 5/14 → 8/14, reported
-> without over-claiming (three of the eight passes are unrelated to this
-> stage's own changes, and one previously solid case regressed for an
-> unrelated reason). Running the brief's literal `deepeval test run
-> tests/` for the first time surfaced a new, still-unexplained
-> infrastructure defect — the offline tracer stopped recording
-> mid-session — recovered with a second, separate invocation, the same
-> configuration stages 7/8 always used. Two real infrastructure defects
-> from stage 9c were also fixed along the way (a retrieval-reranker race
-> condition, a Windows console encoding issue), neither related to any
-> prompt. Full detail: `docs/reports/stage-9d.md`. Only documentation
-> (final report, diagram set) remains for stage 10.
+> **Status: stage 9e of 10 (third fix-and-remeasure iteration, n=3
+> measurement) complete.** The RAG foundation (stage 2), the three
+> sub-agents (stage 3), both coordination paths — the agent-as-tool
+> Supervisor and the explicit `StateGraph` — with the REPL that drives
+> either one (stage 4), observability (stage 5, OpenTelemetry + optional
+> Langfuse Cloud + offline span dumps), the 15-case golden dataset
+> (stage 6), the three component metrics (stage 7), tool-correctness
+> (stage 8), and three end-to-end fix-and-remeasure iterations (stages 9a
+> through 9e) are all built and run for real. Stage 9e ran six phases —
+> infrastructure, a refusal-metric substitution, a fabrication-cluster
+> fix, the remaining named defects (an incoherence criterion for the
+> Planner, an indirect-injection mitigation), offline diagnostics, and a
+> formal **n=3 measurement**, this project's first — and closed on a
+> negative, honestly reported result: `Overall: 18/26, 17/26, 19/26 —
+> mean 18.0/26 (69.2%), range 65.4-73.1%`. The single-run checkpoint's own
+> apparent +1 gain (19/26 vs. the prior 18/26 baseline) turned out to sit
+> **inside** this measurement's own run-to-run range, not a provable
+> improvement — the central finding n=3 exists to produce. Two real
+> infrastructure defects were found and fixed live during the measurement
+> itself (a masking `AttributeError` from a missing Windows locking
+> dependency; a `UnicodeEncodeError` that lost an entire live invocation's
+> result to a Windows console-codepage crash on an emoji), both costing
+> real, stated money with no usable result before the fix. Every stable
+> failure and every flaky case traces to a defect this stage already named
+> — none is new; four candidates for a further iteration are recorded,
+> not attempted. Full detail: `docs/reports/stage-9e.md`. Only
+> documentation (final report) remains for stage 10.
 
 ## Architecture
 

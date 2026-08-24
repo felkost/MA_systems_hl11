@@ -62,6 +62,7 @@ LAYER_OF_MODULE: dict[str, str] = {
     "evals.runner": OBS,
     "evals.summarize_e2e": OBS,
     "evals.aggregate_runs": OBS,
+    "evals.repeat_summary": OBS,
 }
 
 #  Stage 2 finding: a layer must be allowed to import itself. The table in
