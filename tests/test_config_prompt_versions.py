@@ -1,11 +1,10 @@
-"""D3.4: `Settings.critic_prompt_version` defaults to `"c2"`, the version
-whose verdict/booleans coupling `docs/task-hl11.md`'s own Critique Quality
-GEval steps measure against (`docs/specs/stage-3.md`, D3.4).
+"""`Settings.critic_prompt_version` defaults to `"c2"`, the version
+whose verdict/booleans coupling the assignment's own Critique Quality
+GEval steps measure against.
 
 Every test in this file passes `openrouter_api_key` explicitly:
 `Settings.model_validate({})` only constructs on a machine with an untracked
-`.env` -- the same "green by accident" trap named at stage 1
-(`docs/specs/stage-3.md`, adversarial-verifier pass).
+`.env` -- a "green by accident" trap, caught and avoided here.
 """
 
 from __future__ import annotations

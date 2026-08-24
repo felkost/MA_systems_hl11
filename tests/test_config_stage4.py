@@ -1,5 +1,5 @@
-"""Stage-4 spec additions to `Settings`: `composer_prompt_version` and the
-derived `resolved_supervisor_max_tool_calls` (D4.4, D4.13).
+"""Additions to `Settings`: `composer_prompt_version` and the
+derived `resolved_supervisor_max_tool_calls`.
 """
 
 from __future__ import annotations

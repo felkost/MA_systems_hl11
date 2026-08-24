@@ -1,6 +1,5 @@
-"""Stage 9e phase 6's n=3 report: per-case pass frequency, three buckets,
-and Overall as a range -- never one number (`docs/specs/stage-9e.md`,
-D9e.11, go/no-go 7).
+"""An n=3 report: per-case pass frequency, three buckets,
+and Overall as a range -- never one number.
 
 Reads `n` repetitions' own already-written `runs/<eval_run_id>/eval-results.json`
 (`evals.summarize_e2e.main`'s own output, one per repetition of the same
@@ -43,7 +42,7 @@ def _case_passed(case: dict[str, Any]) -> bool:
     metric (`score` absent, per `evals.summarize_e2e`'s own convention) is
     never `success: True` in DeepEval's own persisted case, so it already
     counts as a failure here -- callers additionally surface it separately
-    via `aggregate_repetitions`'s own `errors` list, per D9e.11's "an
+    via `aggregate_repetitions`'s own `errors` list, per this project's own "an
     ERRORED metric counted as a failure and reported separately"."""
     return all(metric["success"] for metric in case["metricsData"])
 
@@ -87,7 +86,7 @@ def aggregate_repetitions(eval_run_ids: list[str]) -> dict[str, Any]:
         `overall_range`: `(min_pct, max_pct)` pass-rate percentages.
         `denominators`: each repetition's own total scored-case count.
         `denominator_varies`: `True` when `denominators` are not all equal
-          -- D9e.11's own "a varying denominator (26 or 27) handled
+          -- this project's own "a varying denominator (26 or 27) handled
           explicitly", never assumed constant.
         `errors`: `[{"run_id", "case", "metric"}, ...]` for every ERRORed
           metric found, in repetition order.
@@ -147,7 +146,7 @@ def aggregate_repetitions(eval_run_ids: list[str]) -> dict[str, Any]:
 
 
 def render_repeat_summary_markdown(agg: dict[str, Any]) -> str:
-    """`docs/specs/stage-9e.md`'s own worked example shape, verbatim:
+    """Renders as, e.g.:
     `Overall: 24/26, 25/26, 25/26 — mean 24.7/26 (94.9%), range 92.3-96.2%`.
     """
     lines: list[str] = []

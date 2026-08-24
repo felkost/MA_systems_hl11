@@ -8,8 +8,7 @@ that knows OpenRouter's base URL.
 `langchain_huggingface` is imported inside `build_embeddings`, not at module
 scope: importing it eagerly pulls in `sentence_transformers`, the same cost
 `retriever.py` defers for the cross-encoder. `EMBEDDING_PROVIDER` stays
-`"openrouter"` by default (the corrected stage-2 decision -- see
-`docs/specs/stage-2.md`, "The embedding decision"); `"local"` is the
+`"openrouter"` by default; `"local"` is the
 documented offline escape hatch.
 """
 
@@ -27,14 +26,13 @@ from config import Settings
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# model id -> (prompt $/token, completion $/token). Mirrors
-# docs/model-prices-2026-08-22.md exactly (docs/specs/stage-5.md, D5.2) --
-# that file is gitignored, so the literal is reproduced here rather than
-# merely cited. Lives in models.py, not observability.py: middleware.py
+# model id -> (prompt $/token, completion $/token), from a live
+# OpenRouter catalogue check.
+# Lives in models.py, not observability.py: middleware.py
 # (infra) needs compute_cost for TracingMiddleware's per-model-call span
 # attributes, and infra may not import an obs-layer module
 # (tests/test_layering.py's MAY_IMPORT[INFRA] has no OBS entry) -- a gap
-# the stage-5 spec's own detailed design missed until implementation.
+# missed at design time until implementation.
 # observability.py re-exports both names so `observability.PRICE_TABLE`/
 # `observability.compute_cost` still work for its own callers.
 PRICE_TABLE: dict[str, tuple[float, float]] = {
@@ -63,7 +61,7 @@ def compute_cost(model: str, input_tokens: int, output_tokens: int) -> float | N
 
 def compute_cost_or_raise(model: str, input_tokens: int, output_tokens: int) -> float:
     """`compute_cost`, but an unpriced model raises instead of returning
-    `None` (stage 9e, D9e.17).
+    `None`.
 
     `or 0.0` on `compute_cost`'s own `None` return silently records an
     unpriced model's entire cost as $0.00 -- exactly the "unmeasured
@@ -88,9 +86,9 @@ def compute_cost_or_raise(model: str, input_tokens: int, output_tokens: int) -> 
 
 # The roles whose caller builds a strict structured-output request:
 # "planner"/"critic" via ProviderStrategy(..., strict=True) (agents/planner.py,
-# agents/critic.py, stage 3) -- hardcoded rather than introspected from
+# agents/critic.py) -- hardcoded rather than introspected from
 # agents/*.py, since this module sits below agents/ in the layer table and
-# must not import upward. "judge" joins the same way (stage 7+): a judge
+# must not import upward. "judge" joins the same way: a judge
 # model that cannot honour strict structured output must fail at startup,
 # not mid-dataset-run.
 _STRUCTURED_OUTPUT_ROLES = ("planner", "critic", "judge")
@@ -131,8 +129,7 @@ def build_embeddings(settings: Settings) -> Embeddings:
     -------
     Embeddings
         `OpenAIEmbeddings` pointed at OpenRouter for `"openrouter"`
-        (`POST /api/v1/embeddings`, verified live -- see
-        `docs/specs/stage-2.md`); otherwise `HuggingFaceEmbeddings`
+        (`POST /api/v1/embeddings`, verified live); otherwise `HuggingFaceEmbeddings`
         (`langchain_huggingface`), cached under `settings.model_cache_dir`.
     """
     if settings.embedding_provider == "local":
@@ -224,5 +221,5 @@ async def _fetch_openrouter_models(settings: Settings) -> dict[str, dict[str, An
 def _supports_structured_output(entry: dict[str, Any]) -> bool:
     """`"structured_outputs"` only -- looser than `"response_format"`, which
     some models report without honouring `strict=True` (verified live at
-    stage 1 against the full catalog)."""
+    directly against the full catalog)."""
     return "structured_outputs" in entry.get("supported_parameters", [])

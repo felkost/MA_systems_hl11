@@ -4,10 +4,10 @@ knowledge-base tools.
 Bound to `web_search`, `read_url` and `knowledge_search`. Returns free-text
 findings as structured Markdown with inline citations -- it does not save
 anything; only the Supervisor's `save_report` tool, gated by human approval,
-writes to disk. Stateless per invocation: no checkpointer (D3.6), one human
+writes to disk. Stateless per invocation: no checkpointer, one human
 message in, one findings message out.
 
-Ported from `MA_systems_hl10`; see `agents/planner.py` for the shared D3.2
+Ported from `MA_systems_hl10`; see `agents/planner.py` for the shared
 dependency-inversion rationale.
 """
 
@@ -49,7 +49,7 @@ def create_research_agent(
     ----------
     settings : Settings
     tools : Sequence of BaseTool
-        Must name exactly `RESEARCHER_ALLOWLIST` (D3.5).
+        Must name exactly `RESEARCHER_ALLOWLIST`.
     model : BaseChatModel
         Built by the caller. Tests inject a scripted fake instead.
     middleware : Sequence of AgentMiddleware
@@ -61,7 +61,7 @@ def create_research_agent(
     CompiledStateGraph
         A graph whose `invoke` result carries the findings as free-text
         Markdown in the last message -- there is no `response_format`.
-        Never constructed with a checkpointer (D3.6).
+        Never constructed with a checkpointer.
     """
     assert_allowlist(tools, RESEARCHER_ALLOWLIST, "researcher")
 

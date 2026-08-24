@@ -1,4 +1,4 @@
-"""Schema/contract tests for `tests/golden_dataset.json` (stage 6).
+"""Schema/contract tests for `tests/golden_dataset.json`.
 
 The dataset is the measuring instrument for stages 7-9; a malformed or
 drifted dataset would make every later stage's numbers meaningless without
@@ -11,7 +11,7 @@ plan's own audit named:
   freshest source, or it silently turns into a corpus lookup that passes
   for the wrong reason;
 - every case that needs a fixture file actually has one, present and
-  readable, so a stage-9 live run does not fail on a missing file instead
+  readable, so a live run does not fail on a missing file instead
   of measuring what it set out to measure.
 
 All of the above except the last (an explicit `@pytest.mark.smoke` test)

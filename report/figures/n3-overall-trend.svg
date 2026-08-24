@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 480" role="img" aria-labelledby="s9e1-title s9e1-desc">
+    <title id="s9e1-title">Overall pass rate across the checkpoint and three n=3 repetitions</title>
+    <desc id="s9e1-desc">Bar chart of four measurements — checkpoint 73.1%, repetition 1 69.2%, repetition 2 65.4%, repetition 3 73.1% — with a dashed mean line at 69.2% and a labelled min-max range whisker of 65.4-73.1% for the three repetitions, showing the checkpoint's own apparent gain sits inside ordinary run-to-run variance.</desc>
+    <rect width="100%" height="100%" fill="#ffffff"/>
+    <defs>
+      <marker id="s9e1-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#9296a8"/>
+      </marker>
+    </defs>
+
+    
+    <line x1="80" y1="400" x2="920" y2="400" stroke="#4c526d" stroke-width="1"/>
+    <line x1="80" y1="325" x2="920" y2="325" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <line x1="80" y1="250" x2="920" y2="250" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <line x1="80" y1="175" x2="920" y2="175" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <line x1="80" y1="100" x2="920" y2="100" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <text x="72" y="404" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="end">0%</text>
+    <text x="72" y="329" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="end">25%</text>
+    <text x="72" y="254" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="end">50%</text>
+    <text x="72" y="179" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="end">75%</text>
+    <text x="72" y="104" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="end">100%</text>
+
+    
+    <line x1="80" y1="192" x2="920" y2="192" stroke="#6f7690" stroke-width="1.2" stroke-dasharray="6,4"/>
+
+    
+    <rect x="160" y="181" width="120" height="219" fill="rgba(76,82,109,0.10)" stroke="#4c526d" stroke-width="1"/>
+    <text x="220" y="169" fill="#4c526d" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">19/26</text>
+    <text x="220" y="184" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">(73.1%)</text>
+    <text x="220" y="424" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">Checkpoint</text>
+    <text x="220" y="440" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">(single run, n=1)</text>
+
+    <rect x="360" y="192" width="120" height="208" fill="rgba(76,82,109,0.10)" stroke="#4c526d" stroke-width="1"/>
+    <text x="420" y="180" fill="#4c526d" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">18/26</text>
+    <text x="420" y="195" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">(69.2%)</text>
+    <text x="420" y="424" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">Repetition 1</text>
+
+    <rect x="560" y="204" width="120" height="196" fill="rgba(241,132,138,0.12)" stroke="#f1848a" stroke-width="1"/>
+    <text x="620" y="170" fill="#f1848a" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">17/26</text>
+    <text x="620" y="185" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">(65.4%)</text>
+    <text x="620" y="424" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">Repetition 2</text>
+
+    <rect x="760" y="181" width="120" height="219" fill="rgba(76,82,109,0.10)" stroke="#4c526d" stroke-width="1"/>
+    <text x="820" y="169" fill="#4c526d" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">19/26</text>
+    <text x="820" y="184" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">(73.1%)</text>
+    <text x="820" y="424" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">Repetition 3</text>
+
+    
+    <line x1="940" y1="181" x2="940" y2="204" stroke="#4c526d" stroke-width="1.2"/>
+    <line x1="932" y1="181" x2="948" y2="181" stroke="#4c526d" stroke-width="1.2"/>
+    <line x1="932" y1="204" x2="948" y2="204" stroke="#4c526d" stroke-width="1.2"/>
+    <text x="940" y="164" fill="#4c526d" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.06em">RANGE</text>
+    <text x="940" y="222" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">65.4–73.1%</text>
+    <text x="940" y="236" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">(n=3)</text>
+
+    
+    <line x1="30" y1="452" x2="970" y2="452" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <rect x="30" y="462" width="16" height="10" rx="2" fill="rgba(76,82,109,0.10)" stroke="#4c526d" stroke-width="1"/>
+    <text x="52" y="471" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">measurement</text>
+    <rect x="200" y="462" width="16" height="10" rx="2" fill="rgba(241,132,138,0.12)" stroke="#f1848a" stroke-width="1"/>
+    <text x="222" y="471" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">this stage's own lowest single run</text>
+    <line x1="560" y1="467" x2="590" y2="467" stroke="#6f7690" stroke-width="1.2" stroke-dasharray="6,4"/>
+    <text x="596" y="471" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">mean, n=3: 18.0/26 (69.2%)</text>
+  </svg>

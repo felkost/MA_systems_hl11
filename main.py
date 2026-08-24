@@ -1,21 +1,21 @@
 """The REPL: streams responses, prints tool calls, drives the interrupt/
-resume loop over either coordination path (`docs/specs/stage-4.md`).
+resume loop over either coordination path.
 
-**D4.6 -- one stable `thread_id` per session**, created once at REPL start
+**one stable `thread_id` per session**, created once at REPL start
 and reused across every turn, so a multi-turn conversation shares
 checkpointed state and the revision-cap middleware's per-question scoping
 (`middleware.py`, `_run_tool_call_ids`) resets correctly on each new
 `HumanMessage`.
 
-**D4.6 -- the resume payload is a list, not a bare decision.** An interrupt
+**the resume payload is a list, not a bare decision.** An interrupt
 can gate more than one tool call in one turn
 (`HITLRequest["action_requests"]`), so `Command(resume=...)` always carries
 `{"decisions": [...]}`, one entry per action request, via
 `hitl.resolve_interrupt`.
 
-**D4.11 -- headless decisions.** `--headless` supplies `approve` for every
+**headless decisions.** `--headless` supplies `approve` for every
 gated call through the *same* `HumanInTheLoopMiddleware`/manual-`interrupt`
-contract, never by disabling the gate. This exists because stage 8/9's
+contract, never by disabling the gate. This exists because the
 evaluation runs 15 cases, each stopping at the same interrupt, and
 `evals/runner.py` is obs-layer and may not import `supervisor`
 (`tests/test_layering.py`) -- nothing else could drive an unattended run.
@@ -81,7 +81,7 @@ def build_graph(
 
 
 def auto_approve_decisions(request: HITLRequest) -> HITLResponse:
-    """D4.11's headless resolver: `approve` for every gated action request,
+    """The headless resolver: `approve` for every gated action request,
     through the real decision contract."""
     return HITLResponse(
         decisions=[{"type": "approve"} for _ in request["action_requests"]]
@@ -171,10 +171,10 @@ def run_session(
     write : Callable[[str], None]
         `print` in the real REPL.
     resolve_decisions : Callable[[HITLRequest], HITLResponse]
-        `interactive_decisions(...)` or `auto_approve_decisions` (D4.11).
+        `interactive_decisions(...)` or `auto_approve_decisions`.
     thread_id : str, optional
         Defaults to a fresh `uuid4()` -- the one stable id reused across
-        every turn in this session (D4.6).
+        every turn in this session.
 
     Returns
     -------
@@ -195,8 +195,8 @@ def run_session(
         if question is None:
             return tid
         payload: Any = {"messages": [HumanMessage(content=question)]}
-        # D5.7: run_id is fresh per turn, not the session's thread_id --
-        # "one question = one trace" (docs/specs/stage-5.md). Rides OTel's
+        # run_id is fresh per turn, not the session's thread_id --
+        # "one question = one trace". Rides OTel's
         # own Baggage so RunIdStampingProcessor can stamp it onto every
         # span this turn creates, without threading it through
         # supervisor.py/orchestrator.py/middleware.py by hand.
@@ -242,7 +242,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Auto-approve every HITL gate through the real decision "
-            "contract (D4.11) -- for unattended evaluation runs, never "
+            "contract -- for unattended evaluation runs, never "
             "the default."
         ),
     )
@@ -261,7 +261,7 @@ def main(argv: Sequence[str] = ()) -> None:
         else interactive_decisions(read=input, write=print)
     )
 
-    # Built once per process (D5.3/D5.11/D5.13) -- only main.py (interface)
+    # Built once per process -- only main.py (interface)
     # imports observability.py; every other layer reaches OpenTelemetry's
     # ambient global tracer directly.
     handle = observability.configure_observability(settings)

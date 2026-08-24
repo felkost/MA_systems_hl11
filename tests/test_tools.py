@@ -1,4 +1,4 @@
-"""Tool-correctness tests -- R3a/R3b/R3c (`docs/task-hl11.md`, section 3).
+"""Tool-correctness tests -- the assignment's own three tool-correctness cases.
 
 `tools_called` is read from the run's own offline span dump, never from a
 mock. This needs one caveat for `save_report` specifically: `TracingMiddleware`

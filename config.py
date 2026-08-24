@@ -3,27 +3,26 @@
 Every tunable value lives on `Settings`. There is exactly one chat-model
 provider in this project -- OpenRouter -- so, unlike both donor projects,
 there is no `LLM_PROVIDER` toggle: a setting with one legal value is noise
-that invites a second value later (`docs/specs/stage-2.md`, "`models.py` --
-OpenRouter only, no provider toggle for LLMs"). `EMBEDDING_PROVIDER` stays a
+that invites a second value later. `EMBEDDING_PROVIDER` stays a
 real toggle (`openrouter | local`) because it genuinely has two values -- the
 local Hugging Face branch is the documented offline escape hatch.
 
 `_CacheSettings` is deliberately separate from `Settings`: it exists only to
 put `HF_HOME`/`PIP_CACHE_DIR`/`DEEPEVAL_HOME` into `os.environ` at import
-time, before any Hugging Face or DeepEval import can read them (stage 0's
-own finding: pydantic-settings parses `.env` into `Settings` and exports
-nothing to the process environment, so those variables otherwise do nothing
-on their own). Its `settings_customise_sources` drops the ambient-OS-environment
-source entirely for these three fields -- the CLAUDE.md invariant "`Settings`
-decides, not the ambient environment" applied literally: an already-exported
+time, before any Hugging Face or DeepEval import can read them
+(pydantic-settings parses `.env` into `Settings` and exports nothing to the
+process environment, so those variables otherwise do nothing on their own).
+Its `settings_customise_sources` drops the ambient-OS-environment source
+entirely for these three fields -- this project's own invariant, "`Settings`
+decides, not the ambient environment", applied literally: an already-exported
 `HF_HOME` from some other tool on this machine must not decide where this
 project's model cache lands.
 
-`DEEPEVAL_HOME` joined the other two at stage 7: `import deepeval` writes an
-anonymous telemetry identity file there (measured, stage 7 kickoff --
-`.venv/Lib/site-packages/deepeval/telemetry/identity.py`), and its own
-default is `Path.home() / ".deepeval"` -- `C:\\Users\\...` on this machine,
-the one place CLAUDE.md's Forbidden list bans a cache from landing. With
+`DEEPEVAL_HOME` joined the other two once component tests started running:
+`import deepeval` writes an anonymous telemetry identity file there
+(measured directly against `.venv/Lib/site-packages/deepeval/telemetry/identity.py`),
+and its own default is `Path.home() / ".deepeval"` -- `C:\\Users\\...` on
+this machine, the one place this project bans a cache from landing. With
 `DEEPEVAL_TELEMETRY_OPT_OUT=YES` set (it is, in `.env.example` and in CI)
 no file is written at all and `DEEPEVAL_HOME` never matters in practice --
 it is set anyway so the invariant holds even if telemetry is ever turned
@@ -77,10 +76,10 @@ class Settings(BaseSettings):
     judge_model_name: str | None = None
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
 
-    # -- Prompt versions (prompts.py, stage 3). `critic_prompt_version`
+    # -- Prompt versions (prompts.py). `critic_prompt_version`
     # defaults to "c2", the coupled verdict/booleans version -- matching
-    # hl8's own default and what docs/task-hl11.md's Critique Quality GEval
-    # measures against (docs/specs/stage-3.md, D3.4). `researcher_prompt_version`
+    # hl8's own default and what the assignment's own Critique Quality GEval
+    # measures against. `researcher_prompt_version`
     # defaults to "r2": "r1" filled gaps its own retrieved sources did not
     # support with plausible-sounding invented facts; "r2" adds an explicit
     # instruction against that, and "r1" stays registered for comparison.
@@ -97,8 +96,8 @@ class Settings(BaseSettings):
     critic_max_tool_calls: int = Field(default=5, ge=1, le=50)
     max_read_url_per_search: int | None = Field(default=2, ge=1, le=10)
     # No default: `resolved_supervisor_max_tool_calls` derives a headroom-
-    # aware value from `max_revisions` when this is left unset (stage-4 spec
-    # D4.13) -- a fixed default sized for one `max_revisions` value is wrong
+    # aware value from `max_revisions` when this is left unset --
+    # a fixed default sized for one `max_revisions` value is wrong
     # for the others, since the worst-case legitimate call count scales with
     # the cap itself.
     supervisor_max_tool_calls: int | None = Field(default=None, ge=1, le=200)
@@ -136,16 +135,16 @@ class Settings(BaseSettings):
     embedding_model: str = "openai/text-embedding-3-small"
     embedding_dimensions: int | None = Field(default=None, ge=64, le=3072)
 
-    # -- HITL checkpoint: unused. Stage 4 runs `MemorySaver` on the
+    # -- HITL checkpoint: unused. `MemorySaver` runs on the
     # Supervisor and on the compiled orchestrator graph -- never a
-    # sub-agent's (CLAUDE.md invariant) -- because
+    # sub-agent's --
     # `langgraph-checkpoint-sqlite` is not a dependency and an in-process
     # REPL session needs no cross-process durability. The field and
-    # `paths.checkpoint_path` wait for a stage that adds the backend.
+    # `paths.checkpoint_path` wait for a future backend.
     checkpoint_db: str = "runtime/checkpoints.sqlite"
 
-    # -- Observability (stage 5), Langfuse Cloud only -- no docker-compose.yml
-    # exists or may exist in this project (CLAUDE.md, Forbidden).
+    # -- Observability, Langfuse Cloud only -- no docker-compose.yml
+    # exists or may exist in this project.
     tracing_enabled: bool = False
     langfuse_public_key: SecretStr | None = None
     langfuse_secret_key: SecretStr | None = None
@@ -154,12 +153,12 @@ class Settings(BaseSettings):
     span_dump_dir: str | None = None
     max_span_payload_length: int = Field(default=2000, ge=100, le=20_000)
 
-    # -- Evaluation tooling (stage 9e). A plain `Settings` field, not a
+    # -- Evaluation tooling. A plain `Settings` field, not a
     # `_CacheSettings` one (see `export_deepeval_timeout_override`'s own
     # docstring below): a shell-set override is legitimate here, unlike for
     # HF_HOME, so ordinary pydantic-settings precedence (env > .env >
     # default) is exactly right and needs no source-list surgery.
-    # 900s, raised from 600 at stage 9e phase 1b together with
+    # 900s, raised from 600 together with
     # `OpenRouterModel`'s own client timeout (120 -> 180s): the invariant
     # `PER_TASK >= n_sequential_judge_calls * httpx_timeout + slack` has to
     # keep holding, and `AnswerRelevancyMetric`'s 3 sequential calls at 180s
@@ -167,7 +166,7 @@ class Settings(BaseSettings):
     deepeval_per_task_timeout_seconds: float = Field(default=900.0, gt=0.0)
     # `None` keeps today's behaviour byte-for-byte reproducible: DeepEval's
     # OpenRouter payload carries no `reasoning` key at all unless this is
-    # set (D9e.16). Ships disabled -- capping the judge's thinking budget
+    # set. Ships disabled -- capping the judge's thinking budget
     # may change its scoring behaviour, not just its cost, so a probe
     # decides before this is ever turned on for a real run.
     judge_reasoning_effort: str | None = None
@@ -182,8 +181,8 @@ class Settings(BaseSettings):
     @classmethod
     def _blank_tracing_flag_means_off(cls, value: object) -> object:
         """A present-but-empty `TRACING_ENABLED=` line means "off", not a
-        `bool_parsing` error -- `.env.example` leaves it blank until stage 5
-        gives it a reader, deliberately, and that must still construct
+        `bool_parsing` error -- `.env.example` leaves it blank until
+        observability gives it a reader, deliberately, and that must still construct
         `Settings` today."""
         return False if value == "" else value
 
@@ -223,7 +222,7 @@ class Settings(BaseSettings):
             `critique` costs one more, so a headroom of 2 is exactly
             consumed by one of each -- and hl10 measured a live
             double-reject. 3 covers the double-reject plus one refusal
-            (`docs/specs/stage-4.md`, D4.13).
+           .
         """
         if self.supervisor_max_tool_calls is not None:
             return self.supervisor_max_tool_calls
@@ -250,7 +249,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _tracing_requires_langfuse_keys(self) -> Settings:
-        """Refuse to start rather than trace into the void (stage 5)."""
+        """Refuse to start rather than trace into the void."""
         if self.tracing_enabled and (
             self.langfuse_public_key is None or self.langfuse_secret_key is None
         ):
@@ -347,8 +346,8 @@ def _export_cache_env() -> None:
 
     Runs once at import time -- before any module in this project can import
     `sentence_transformers`, `huggingface_hub`, or `deepeval`, all of which
-    read `os.environ` and nothing else (stage 0's finding, extended to
-    `DEEPEVAL_HOME` at stage 7).
+    read `os.environ` and nothing else -- a finding this rule was extended
+    to cover `DEEPEVAL_HOME` for too.
     """
     cache = _CacheSettings()
     os.environ["HF_HOME"] = str(paths.resolve(cache.hf_home))
@@ -361,7 +360,7 @@ _export_cache_env()
 
 def export_deepeval_timeout_override(settings: Settings) -> None:
     """Write `settings.deepeval_per_task_timeout_seconds` into DeepEval's
-    own per-task timeout override, at the binding knob (stage 9e, D9e.1).
+    own per-task timeout override, at the binding knob.
 
     Not called at import time (unlike `_export_cache_env`): `Settings()`
     requires `openrouter_api_key`, which is exactly why the cache-only
@@ -391,7 +390,7 @@ def export_deepeval_timeout_override(settings: Settings) -> None:
 
     The deadline this actually targets is DeepEval's per-test-case budget
     (180s by default), not the httpx read timeout `evals/deepeval_model.py`
-    already carries (D9d.4 raised that one, 60 -> 120s, which turned out
+    already carries (raised once already, 60 -> 120s, which turned out
     not to be the knob that was cancelling metrics). The invariant that
     must hold between the two: `PER_TASK >= n_sequential_judge_calls *
     httpx_timeout + slack` -- `AnswerRelevancyMetric` alone makes three

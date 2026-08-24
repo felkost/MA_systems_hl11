@@ -2,14 +2,13 @@
 
 Bound to `web_search` and `knowledge_search` only -- reconnaissance to
 understand the domain, not a deep read of any one source. Stateless per
-invocation: no checkpointer (D3.6), one human message in, one `ResearchPlan`
+invocation: no checkpointer, one human message in, one `ResearchPlan`
 out.
 
 Ported from `MA_systems_hl10`, finishing the dependency inversion hl10
 started: `model`, `tools` and `middleware` all arrive as parameters, and
 none of the three is imported from `models.py`/`tools.py`/`middleware.py` --
-`agents.*` is `DOMAIN` and all three are `INFRA`
-(`docs/specs/stage-3.md`, D3.2).
+`agents.*` is `DOMAIN` and all three are `INFRA`.
 """
 
 from __future__ import annotations
@@ -66,7 +65,7 @@ def create_planner_agent(
     settings : Settings
     tools : Sequence of BaseTool
         Must name exactly `PLANNER_ALLOWLIST` -- checked before any model
-        call (D3.5).
+        call.
     model : BaseChatModel
         Built by the caller, e.g. `models.build_chat_model(settings,
         "planner")`. Tests inject a scripted fake instead.
@@ -80,7 +79,7 @@ def create_planner_agent(
     CompiledStateGraph
         A graph whose `invoke` result carries the parsed `ResearchPlan` in
         `result["structured_response"]`. Never constructed with a
-        checkpointer (D3.6) -- only the Supervisor gets one.
+        checkpointer -- only the Supervisor gets one.
     """
     assert_allowlist(tools, PLANNER_ALLOWLIST, "planner")
 
@@ -91,7 +90,7 @@ def create_planner_agent(
         response_format=PLANNER_RESPONSE_FORMAT,
         middleware=list(middleware),
     )
-    # Read by telemetry off on_tool_start's own metadata (stage 5) --
+    # Read by telemetry off on_tool_start's own metadata --
     # confirmed by hl8 to survive nested invocation, so every tool call this
     # graph's own ReAct loop makes attributes to "planner" regardless of
     # which module invokes it.

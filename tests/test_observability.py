@@ -1,13 +1,12 @@
 """`observability.py` -- TracerProvider ownership, Langfuse attachment, the
-offline span dump, cost computation, rotating file logs (stage 5,
-`docs/specs/stage-5.md`).
+offline span dump, cost computation, rotating file logs.
 
-D5.14 -- OpenTelemetry's global `TracerProvider` registration is a
+OpenTelemetry's global `TracerProvider` registration is a
 process-wide singleton with no public reset API. `_reset_otel_global_state`
 resets both OTel's own private globals and this module's own `_CONFIGURED`
-sentinel (D5.13); an autouse fixture applies it before and after every test
+sentinel; an autouse fixture applies it before and after every test
 in this file. `tests/test_main.py` imports and reuses this same helper
-around its one test that also needs a registered provider (D5.14, round 2).
+around its one test that also needs a registered provider.
 """
 
 from __future__ import annotations
@@ -147,7 +146,7 @@ def test_compute_cost_or_raise_returns_the_same_value_as_compute_cost() -> None:
 
 
 def test_compute_cost_or_raise_names_the_model_for_an_unpriced_one() -> None:
-    """D9e.17: `tests/test_e2e.py` used to apply `or 0.0` to `compute_cost`,
+    """`tests/test_e2e.py` used to apply `or 0.0` to `compute_cost`,
     which silently recorded an unpriced judge model's entire cost as $0.00.
     An unknown model must fail loudly instead, naming the model, not return
     a silent zero."""
@@ -187,7 +186,7 @@ def test_run_id_stamping_tags_every_span_in_a_turn_not_the_previous_turns(
 
     # span_dump_dir redirected to tmp_path even though this test only
     # inspects the in-memory exporter below -- configure_observability
-    # always attaches a real SpanJsonExporter too (D5.4), which would
+    # always attaches a real SpanJsonExporter too, which would
     # otherwise write run-A/run-B directories into the real project's
     # runs/ on every gate run.
     handle = observability.configure_observability(

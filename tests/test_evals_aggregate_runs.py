@@ -1,4 +1,4 @@
-"""`evals.aggregate_runs` (stage 9e, D9e.2a).
+"""`evals.aggregate_runs`.
 
 Offline: DeepEval's own `.latest_run_full.json` is never touched -- every
 test monkeypatches the module-level `LATEST_FULL_TEST_RUN_FILE_PATH` both
@@ -84,9 +84,9 @@ def test_snapshot_latest_run_raises_load_latest_runs_own_error(
 def test_collect_invocation_artefacts_appends_costs_and_copies_spans(
     eval_run_id: str,
 ) -> None:
-    """Stage 9e phase 1b: bridging two invocations' own `case-costs.jsonl`/
+    """Bridging two invocations' own `case-costs.jsonl`/
     `spans/` was done by hand at the live checkpoint (`cat >>`, `cp`) --
-    this is that step made repeatable, since phase 6's n=3 repeats it six
+    this is that step made repeatable, since an n=3 measurement repeats it six
     times."""
     source_id = str(uuid4())
     try:

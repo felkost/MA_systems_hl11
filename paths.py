@@ -79,8 +79,7 @@ def run_dir(run_id: str, runs_dir: str | Path = "runs") -> Path:
     Parameters
     ----------
     run_id : str
-        Fresh per question/turn (stage 5, `docs/specs/stage-5.md` D5.7) --
-        not the REPL session's `thread_id`.
+        Fresh per question/turn -- not the REPL session's `thread_id`.
     runs_dir : str or Path, default "runs"
         Explicit so a test can redirect it under `tmp_path`, the same shape
         `log_path`'s `log_dir` already uses.
@@ -104,7 +103,7 @@ def checkpoint_path(db: str | Path) -> Path:
     """Locate the checkpoint database, creating its parent directory if
     missing.
 
-    Has no caller: stage 4 checkpoints in memory, so nothing in the shipped
+    Has no caller: checkpoints run in memory, so nothing in the shipped
     system is crash-safe. Kept for the stage that adds a durable backend.
 
     Parameters

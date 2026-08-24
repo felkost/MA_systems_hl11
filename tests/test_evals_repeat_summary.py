@@ -1,4 +1,4 @@
-"""`evals.repeat_summary` (stage 9e phase 6, D9e.11's own reporting shape).
+"""`evals.repeat_summary` -- an n=3 reporting shape.
 
 Offline, hand-written `eval-results.json` fixtures under `tmp_path`/a
 throwaway `runs/<uuid>/` -- no live spend, matching

@@ -1,10 +1,9 @@
-"""`record_case_cost`/`load_case_costs` round trip (stage 9a, D9a.8).
+"""`record_case_cost`/`load_case_costs` round trip.
 
 Offline: writes into a real `runs/<eval_run_id>/` (via `paths.run_dir`),
 using a throwaway uuid so it never collides with a real eval run, and
-cleans up after itself -- `runs/` is gitignored, but a stray directory left
-behind by a test is exactly the "runs/ pollution" mistake insights.md
-already records once (stage 5).
+cleans up after itself -- a stray directory left behind by a test is real
+pollution of a directory other tools read from.
 """
 
 from __future__ import annotations
@@ -61,7 +60,7 @@ def test_load_case_costs_returns_empty_list_for_an_unknown_run() -> None:
 
 
 def test_persist_case_spans_writes_the_case_scoped_dump() -> None:
-    """D9e.2: three prior stages each lost a diagnosis to the
+    """Three real sessions each lost a diagnosis to the
     `tmp_path_factory` cleanup that ends every live-eval session -- this is
     what keeps one case's own spans past that point."""
     eval_run_id = str(uuid4())

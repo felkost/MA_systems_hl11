@@ -1,5 +1,5 @@
-"""Runs one real full-pipeline Supervisor turn, live, for the R3c
-tool-correctness case (stage 8, `docs/specs/stage-8.md` D8.9).
+"""Runs one real full-pipeline Supervisor turn, live, for the
+Supervisor-save tool-correctness case.
 
 Not a test module (no `test_*` name, so pytest never collects it) -- the
 Supervisor-level counterpart to `tests/live_agents.py`, which runs a single

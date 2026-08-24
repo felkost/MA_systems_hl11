@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 300" role="img" aria-labelledby="s9a-title s9a-desc">
+    <title id="s9a-title">Field scope of the three end-to-end metrics, and Citation Presence's two-strength citation check</title>
+    <desc id="s9a-desc">Five LLMTestCase fields form a column header: input, actual output (the saved report), expected output, retrieval context, tools called. Answer Relevancy reads input and actual output only. Correctness additionally reads expected output. Citation Presence does not read input or expected output, but reads actual output, plus retrieval context at strict strength (a sage circle, checked against a real retrieved chunk) and tools called at coarse strength (a hollow ring, checked only for whether a web tool was called at all, not what it returned).</desc>
+    <rect width="100%" height="100%" fill="#ffffff"/>
+
+    <text x="30" y="26" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" letter-spacing="0.14em">LLMTESTCASE FIELDS — WHAT ONE E2E CASE CARRIES</text>
+
+    <g font-family="Arial,sans-serif" text-anchor="middle">
+      <rect x="300" y="42" width="96" height="60" rx="6" fill="rgba(76,82,109,0.04)" stroke="#4c526d" stroke-width="1"/>
+      <text x="348" y="68" fill="#2d3142" font-size="11" font-weight="600">input</text>
+
+      <rect x="406" y="42" width="96" height="60" rx="6" fill="rgba(76,82,109,0.04)" stroke="#4c526d" stroke-width="1"/>
+      <text x="454" y="62" fill="#2d3142" font-size="11" font-weight="600">actual</text>
+      <text x="454" y="76" fill="#2d3142" font-size="11" font-weight="600">output</text>
+      <text x="454" y="90" fill="#9296a8" font-size="8.5">(saved report)</text>
+
+      <rect x="512" y="42" width="96" height="60" rx="6" fill="rgba(76,82,109,0.04)" stroke="#4c526d" stroke-width="1"/>
+      <text x="560" y="62" fill="#2d3142" font-size="11" font-weight="600">expected</text>
+      <text x="560" y="76" fill="#2d3142" font-size="11" font-weight="600">output</text>
+
+      <rect x="618" y="42" width="96" height="60" rx="6" fill="rgba(203,208,164,0.14)" stroke="#4c526d" stroke-width="1"/>
+      <text x="666" y="62" fill="#2d3142" font-size="11" font-weight="600">retrieval</text>
+      <text x="666" y="76" fill="#2d3142" font-size="11" font-weight="600">context</text>
+      <text x="666" y="90" fill="#5c6a2e" font-size="8.5">knowledge_search only</text>
+
+      <rect x="724" y="42" width="96" height="60" rx="6" fill="rgba(241,132,138,0.07)" stroke="#4c526d" stroke-width="1"/>
+      <text x="772" y="62" fill="#2d3142" font-size="11" font-weight="600">tools</text>
+      <text x="772" y="76" fill="#2d3142" font-size="11" font-weight="600">called</text>
+    </g>
+
+    
+    <g stroke="rgba(76,82,109,0.38)" stroke-width="1.1" stroke-dasharray="4,4">
+      <line x1="348" y1="104" x2="348" y2="127"/><line x1="348" y1="153" x2="348" y2="173"/><line x1="348" y1="199" x2="348" y2="219"/>
+      <line x1="454" y1="104" x2="454" y2="127"/><line x1="454" y1="153" x2="454" y2="173"/><line x1="454" y1="199" x2="454" y2="219"/>
+      <line x1="560" y1="104" x2="560" y2="127"/><line x1="560" y1="153" x2="560" y2="173"/>
+      <line x1="666" y1="104" x2="666" y2="127"/><line x1="666" y1="199" x2="666" y2="219"/>
+      <line x1="772" y1="104" x2="772" y2="127"/><line x1="772" y1="199" x2="772" y2="219"/>
+    </g>
+
+    
+    <rect x="24" y="118" width="796" height="46" rx="5" fill="rgba(76,82,109,0.03)" stroke="#4c526d" stroke-width="1"/>
+    <text x="38" y="136" fill="#2d3142" font-size="10.5" font-weight="600" font-family="Arial,sans-serif">Answer Relevancy</text>
+    <text x="38" y="152" fill="#6f7690" font-size="10.5" font-family="Arial,sans-serif">threshold 0.7 · built-in</text>
+    <g font-family="Arial,sans-serif" text-anchor="middle">
+      <circle cx="348" cy="140" r="7" fill="#4c526d"/>
+      <circle cx="454" cy="140" r="7" fill="#4c526d"/>
+      <circle cx="560" cy="140" r="2.5" fill="#b9bdc9"/>
+      <circle cx="666" cy="140" r="2.5" fill="#b9bdc9"/>
+      <circle cx="772" cy="140" r="2.5" fill="#b9bdc9"/>
+    </g>
+
+    
+    <rect x="24" y="164" width="796" height="46" rx="5" fill="rgba(76,82,109,0.03)" stroke="#4c526d" stroke-width="1"/>
+    <text x="38" y="182" fill="#2d3142" font-size="10.5" font-weight="600" font-family="Arial,sans-serif">Correctness [GEval]</text>
+    <text x="38" y="198" fill="#6f7690" font-size="10.5" font-family="Arial,sans-serif">threshold 0.6 · brief-literal steps</text>
+    <g font-family="Arial,sans-serif" text-anchor="middle">
+      <circle cx="348" cy="186" r="7" fill="#4c526d"/>
+      <circle cx="454" cy="186" r="7" fill="#4c526d"/>
+      <circle cx="560" cy="186" r="7" fill="#4c526d"/>
+      <circle cx="666" cy="186" r="2.5" fill="#b9bdc9"/>
+      <circle cx="772" cy="186" r="2.5" fill="#b9bdc9"/>
+    </g>
+
+    
+    <rect x="24" y="210" width="796" height="46" rx="5" fill="rgba(244,210,112,0.12)" stroke="#c9a227" stroke-width="1.2"/>
+    <text x="38" y="228" fill="#2d3142" font-size="10.5" font-weight="bold" font-family="Arial,sans-serif">Citation Presence [GEval] — custom (R5)</text>
+    <text x="38" y="244" fill="#6f7690" font-size="10.5" font-family="Arial,sans-serif">threshold 0.6 · baseline hypothesis</text>
+    <g font-family="Arial,sans-serif" text-anchor="middle">
+      <circle cx="348" cy="232" r="2.5" fill="#b9bdc9"/>
+      <circle cx="454" cy="232" r="7" fill="#4c526d"/>
+      <circle cx="560" cy="232" r="2.5" fill="#b9bdc9"/>
+      <circle cx="666" cy="232" r="7" fill="#5c6a2e"/>
+      <circle cx="772" cy="232" r="7" fill="none" stroke="#c0525a" stroke-width="2"/>
+    </g>
+
+    <line x1="24" y1="264" x2="820" y2="264" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <text x="24" y="280" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" letter-spacing="0.14em">LEGEND</text>
+    <circle cx="126" cy="276" r="7" fill="#4c526d"/>
+    <text x="140" y="280" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">read</text>
+    <circle cx="200" cy="276" r="2.5" fill="#b9bdc9"/>
+    <text x="212" y="280" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">not read</text>
+    <circle cx="300" cy="276" r="7" fill="#5c6a2e"/>
+    <text x="314" y="280" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">strict — a real retrieved chunk</text>
+    <circle cx="546" cy="276" r="7" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <text x="560" y="280" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">coarse — a call happened, content unchecked</text>
+  </svg>
