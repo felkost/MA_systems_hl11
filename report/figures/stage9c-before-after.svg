@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" role="img" aria-labelledby="s9c-title s9c-desc">
+    <title id="s9c-title">Stage 9c re-measurement: pass/fail per case, r1 versus r2, grouped by target/regression/recovered/unchanged</title>
+    <desc id="s9c-desc">Fourteen golden-dataset cases compared between the r1 Researcher prompt (stage 9a baseline) and the r2 fix (stage 9c). Two cases were the fix's own target and show no improvement, both still failing Correctness. Three unrelated cases regressed from passing to failing. Two unrelated cases newly passed. Seven cases show no status change either way. Overall pass count moved from 6 of 14 to 5 of 14.</desc>
+    <rect width="100%" height="100%" fill="#ffffff"/>
+
+    <text x="30" y="26" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" letter-spacing="0.10em">OVERALL TEST STATUS PER CASE — deepeval test run tests/test_e2e.py</text>
+
+    <g font-family="Arial,sans-serif" text-anchor="middle">
+      <text x="580" y="50" fill="#6f7690" font-size="10" font-weight="600">r1</text>
+      <text x="580" y="62" fill="#9296a8" font-size="8">stage 9a</text>
+      <text x="650" y="50" fill="#6f7690" font-size="10" font-weight="600">r2</text>
+      <text x="650" y="62" fill="#9296a8" font-size="8">stage 9c</text>
+    </g>
+    <text x="675" y="50" fill="#6f7690" font-size="10" font-weight="600" font-family="Arial,sans-serif">Δ Correctness</text>
+
+    
+    <rect x="24" y="66" width="796" height="20" rx="4" fill="rgba(244,210,112,0.28)" stroke="#c9a227" stroke-width="1"/>
+    <text x="34" y="80" fill="#2d3142" font-size="10" font-weight="bold" font-family="Arial,sans-serif">TARGET — the fix's own two cases</text>
+
+    <rect x="24" y="90" width="796" height="24" rx="4" fill="rgba(244,210,112,0.10)" stroke="#c9a227" stroke-width="0.8"/>
+    <text x="36" y="106" fill="#2d3142" font-size="9.5" font-family="Consolas,monospace">edge-narrow-memory-question</text>
+    <circle cx="580" cy="102" r="6" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <circle cx="650" cy="102" r="6" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <text x="675" y="106" fill="#6f7690" font-size="9" font-family="Arial,sans-serif">0.0 → 0.0 — unchanged, still fabricates</text>
+
+    <rect x="24" y="116" width="796" height="24" rx="4" fill="rgba(244,210,112,0.10)" stroke="#c9a227" stroke-width="0.8"/>
+    <text x="36" y="132" fill="#2d3142" font-size="9.5" font-family="Consolas,monospace">edge-mixed-corpus-and-web</text>
+    <circle cx="580" cy="128" r="6" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <circle cx="650" cy="128" r="6" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <text x="675" y="132" fill="#6f7690" font-size="9" font-family="Arial,sans-serif">0.4 → 0.3 — unchanged, slightly worse</text>
+
+    
+    <rect x="24" y="152" width="796" height="20" rx="4" fill="rgba(241,132,138,0.20)" stroke="#c0525a" stroke-width="1"/>
+    <text x="34" y="166" fill="#2d3142" font-size="10" font-weight="bold" font-family="Arial,sans-serif">REGRESSION — unrelated to the fix's own target</text>
+
+    <rect x="24" y="176" width="796" height="24" rx="4" fill="rgba(241,132,138,0.06)" stroke="#c0525a" stroke-width="0.8"/>
+    <text x="36" y="192" fill="#2d3142" font-size="9.5" font-family="Consolas,monospace">core-2026-agent-frameworks</text>
+    <circle cx="580" cy="188" r="6" fill="#5c6a2e"/>
+    <circle cx="650" cy="188" r="6" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <text x="675" y="192" fill="#6f7690" font-size="9" font-family="Arial,sans-serif">1.0 → 0.0 — fabricated post-cutoff frameworks</text>
+
+    <rect x="24" y="202" width="796" height="24" rx="4" fill="rgba(241,132,138,0.06)" stroke="#c0525a" stroke-width="0.8"/>
+    <text x="36" y="218" fill="#2d3142" font-size="9.5" font-family="Consolas,monospace">core-agent-vs-rag-boundary</text>
+    <circle cx="580" cy="214" r="6" fill="#5c6a2e"/>
+    <circle cx="650" cy="214" r="6" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <text x="675" y="218" fill="#6f7690" font-size="9" font-family="Arial,sans-serif">1.0 → 0.0 — see coordination finding, below</text>
+
+    <rect x="24" y="228" width="796" height="24" rx="4" fill="rgba(241,132,138,0.06)" stroke="#c0525a" stroke-width="0.8"/>
+    <text x="36" y="244" fill="#2d3142" font-size="9.5" font-family="Consolas,monospace">core-agent-persona</text>
+    <circle cx="580" cy="240" r="6" fill="#5c6a2e"/>
+    <circle cx="650" cy="240" r="6" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <text x="675" y="244" fill="#6f7690" font-size="9" font-family="Arial,sans-serif">0.7 → 0.6 — failed on Citation Presence instead</text>
+
+    
+    <rect x="24" y="260" width="796" height="20" rx="4" fill="rgba(203,208,164,0.35)" stroke="#5c6a2e" stroke-width="1"/>
+    <text x="34" y="274" fill="#2d3142" font-size="10" font-weight="bold" font-family="Arial,sans-serif">RECOVERED — unrelated, likely ordinary sampling variance</text>
+
+    <rect x="24" y="284" width="796" height="24" rx="4" fill="rgba(203,208,164,0.14)" stroke="#5c6a2e" stroke-width="0.8"/>
+    <text x="36" y="300" fill="#2d3142" font-size="9.5" font-family="Consolas,monospace">adversarial-direct-jailbreak</text>
+    <circle cx="580" cy="296" r="6" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <circle cx="650" cy="296" r="6" fill="#5c6a2e"/>
+    <text x="675" y="300" fill="#6f7690" font-size="9" font-family="Arial,sans-serif">0.5 → 1.0 — no source-grounding question involved</text>
+
+    <rect x="24" y="310" width="796" height="24" rx="4" fill="rgba(203,208,164,0.14)" stroke="#5c6a2e" stroke-width="0.8"/>
+    <text x="36" y="326" fill="#2d3142" font-size="9.5" font-family="Consolas,monospace">edge-ukrainian-language-question</text>
+    <circle cx="580" cy="322" r="6" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <circle cx="650" cy="322" r="6" fill="#5c6a2e"/>
+    <text x="675" y="326" fill="#6f7690" font-size="9" font-family="Arial,sans-serif">judge timed out → judge answered — infra, not r2</text>
+
+    
+    <rect x="24" y="342" width="796" height="20" rx="4" fill="rgba(76,82,109,0.06)" stroke="#4c526d" stroke-width="1"/>
+    <text x="34" y="356" fill="#2d3142" font-size="10" font-weight="bold" font-family="Arial,sans-serif">UNCHANGED — same status both sides (7 cases)</text>
+
+    <g font-family="Consolas,monospace" font-size="9" fill="#4c526d">
+      <text x="36" y="376">adversarial-indirect-injection</text>
+      <text x="36" y="396">core-single-vs-multi-agent</text>
+      <text x="36" y="416">core-tool-calling-role</text>
+      <text x="36" y="436">edge-exhaustive-cross-reference-request</text>
+      <text x="36" y="456">edge-out-of-scope-recipe</text>
+      <text x="36" y="476">edge-underspecified-tell-me-about-agents</text>
+      <text x="36" y="496">failure-nonsense-query</text>
+    </g>
+    <g font-family="Arial,sans-serif" text-anchor="middle">
+      <circle cx="580" cy="372" r="4.5" fill="none" stroke="#c0525a" stroke-width="1.6"/>
+      <circle cx="650" cy="372" r="4.5" fill="none" stroke="#c0525a" stroke-width="1.6"/>
+      <circle cx="580" cy="392" r="4.5" fill="#5c6a2e"/>
+      <circle cx="650" cy="392" r="4.5" fill="#5c6a2e"/>
+      <circle cx="580" cy="412" r="4.5" fill="#5c6a2e"/>
+      <circle cx="650" cy="412" r="4.5" fill="#5c6a2e"/>
+      <circle cx="580" cy="432" r="4.5" fill="none" stroke="#c0525a" stroke-width="1.6"/>
+      <circle cx="650" cy="432" r="4.5" fill="none" stroke="#c0525a" stroke-width="1.6"/>
+      <circle cx="580" cy="452" r="4.5" fill="none" stroke="#c0525a" stroke-width="1.6"/>
+      <circle cx="650" cy="452" r="4.5" fill="none" stroke="#c0525a" stroke-width="1.6"/>
+      <circle cx="580" cy="472" r="4.5" fill="none" stroke="#c0525a" stroke-width="1.6"/>
+      <circle cx="650" cy="472" r="4.5" fill="none" stroke="#c0525a" stroke-width="1.6"/>
+      <circle cx="580" cy="492" r="4.5" fill="#5c6a2e"/>
+      <circle cx="650" cy="492" r="4.5" fill="#5c6a2e"/>
+    </g>
+
+    <line x1="24" y1="512" x2="820" y2="512" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <text x="24" y="528" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" letter-spacing="0.14em">LEGEND</text>
+    <circle cx="126" cy="524" r="6" fill="#5c6a2e"/>
+    <text x="140" y="528" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">test passed (all three metrics cleared threshold)</text>
+    <circle cx="480" cy="524" r="6" fill="none" stroke="#c0525a" stroke-width="2"/>
+    <text x="494" y="528" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">test failed (at least one metric below threshold)</text>
+    <text x="24" y="550" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">Overall: 6/14 (r1, stage 9a) → 5/14 (r2, this run) — n=1 each side, no confidence interval</text>
+  </svg>

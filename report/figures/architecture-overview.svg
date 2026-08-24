@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" role="img" aria-labelledby="ov-title ov-desc">
+    <title id="ov-title">Coordination overview</title>
+    <desc id="ov-desc">main.py selects one of two independent coordination paths by an orchestration flag; both paths gate their one write through the shared hitl.py decision contract, and the two paths are forbidden from importing each other.</desc>
+    <rect width="100%" height="100%" fill="#ffffff"/>
+    <defs>
+      <marker id="ov-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#6f7690"/>
+      </marker>
+      <marker id="ov-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#f1848a"/>
+      </marker>
+    </defs>
+
+    
+    
+    <path d="M 440,112 V 160 Q 440,168 432,168 H 300 Q 292,168 292,176 V 200"
+          fill="none" stroke="#6f7690" stroke-width="1.2" marker-end="url(#ov-arrow)"/>
+    <rect x="332" y="150" width="152" height="14" rx="2" fill="#ffffff"/>
+    <text x="408" y="161" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.04em">--orchestration supervisor</text>
+
+    
+    <path d="M 560,112 V 160 Q 560,168 568,168 H 700 Q 708,168 708,176 V 200"
+          fill="none" stroke="#6f7690" stroke-width="1.2" marker-end="url(#ov-arrow)"/>
+    <rect x="516" y="176" width="156" height="14" rx="2" fill="#ffffff"/>
+    <text x="594" y="187" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.04em">--orchestration graph</text>
+
+    
+    <path d="M 500,112 V 248 a 8,8 0 0,1 0,16 V 400"
+          fill="none" stroke="#6f7690" stroke-width="1" stroke-dasharray="4,3"/>
+    <rect x="452" y="320" width="96" height="14" rx="2" fill="#ffffff"/>
+    <text x="500" y="331" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.04em">resolve_interrupt</text>
+
+    
+    <path d="M 340,312 V 360 Q 340,368 348,368 H 440 Q 448,368 448,376 V 400"
+          fill="none" stroke="#6f7690" stroke-width="1.2" marker-end="url(#ov-arrow)"/>
+    <rect x="292" y="360" width="140" height="14" rx="2" fill="#ffffff"/>
+    <text x="362" y="371" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.04em">ALLOWED_DECISIONS</text>
+
+    
+    <path d="M 660,312 V 360 Q 660,368 652,368 H 560 Q 552,368 552,376 V 400"
+          fill="none" stroke="#6f7690" stroke-width="1.2" marker-end="url(#ov-arrow)"/>
+    <rect x="556" y="344" width="176" height="14" rx="2" fill="#ffffff"/>
+    <text x="644" y="355" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.04em">build_interrupt_request</text>
+
+    
+    <line x1="400" y1="256" x2="600" y2="256" stroke="#f1848a" stroke-width="1.2" stroke-dasharray="5,4"/>
+    <rect x="424" y="200" width="152" height="14" rx="2" fill="#ffffff"/>
+    <text x="500" y="211" fill="#f1848a" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.06em">FORBIDDEN — both ways</text>
+
+    
+    
+    <rect x="380" y="40" width="240" height="72" rx="6" fill="#ffffff"/>
+    <rect x="380" y="40" width="240" height="72" rx="6" fill="#ffffff" stroke="#4c526d" stroke-width="1"/>
+    <rect x="392" y="48" width="76" height="14" rx="2" fill="transparent" stroke="rgba(76,82,109,0.4)" stroke-width="0.8"/>
+    <text x="430" y="58" fill="rgba(76,82,109,0.8)" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.08em">INTERFACE</text>
+    <text x="500" y="82" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">main.py</text>
+    <text x="500" y="98" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">run_session(thread_id)</text>
+
+    
+    <rect x="120" y="200" width="280" height="112" rx="6" fill="#ffffff"/>
+    <rect x="120" y="200" width="280" height="112" rx="6" fill="#ffffff" stroke="#4c526d" stroke-width="1"/>
+    <rect x="132" y="208" width="94" height="14" rx="2" fill="transparent" stroke="rgba(76,82,109,0.4)" stroke-width="0.8"/>
+    <text x="179" y="218" fill="rgba(76,82,109,0.8)" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.08em">APPLICATION</text>
+    <text x="260" y="244" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">supervisor.py</text>
+    <text x="260" y="260" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">create_supervisor()</text>
+    <text x="260" y="276" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">agent-as-tool path</text>
+    <text x="260" y="296" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">wrappers: plan · research · critique</text>
+
+    
+    <rect x="600" y="200" width="280" height="112" rx="6" fill="#ffffff"/>
+    <rect x="600" y="200" width="280" height="112" rx="6" fill="#ffffff" stroke="#4c526d" stroke-width="1"/>
+    <rect x="612" y="208" width="94" height="14" rx="2" fill="transparent" stroke="rgba(76,82,109,0.4)" stroke-width="0.8"/>
+    <text x="659" y="218" fill="rgba(76,82,109,0.8)" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.08em">APPLICATION</text>
+    <text x="740" y="244" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">orchestrator.py</text>
+    <text x="740" y="260" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">create_orchestrator_graph()</text>
+    <text x="740" y="276" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">StateGraph path</text>
+    <text x="740" y="296" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">nodes: planner…critic…composer…save</text>
+
+    
+    <rect x="380" y="400" width="240" height="80" rx="6" fill="#ffffff"/>
+    <rect x="380" y="400" width="240" height="80" rx="6" fill="rgba(241,132,138,0.14)" stroke="#f1848a" stroke-width="1.2"/>
+    <rect x="392" y="408" width="76" height="14" rx="2" fill="transparent" stroke="rgba(241,132,138,0.6)" stroke-width="0.8"/>
+    <text x="430" y="418" fill="#f1848a" font-size="11" font-family="Arial,sans-serif" text-anchor="middle" letter-spacing="0.08em">SHARED</text>
+    <text x="500" y="442" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">hitl.py</text>
+    <text x="500" y="458" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">build_decision · resolve_interrupt</text>
+    <text x="500" y="472" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">imported by both, imports neither</text>
+
+    
+    <line x1="30" y1="500" x2="970" y2="500" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <text x="30" y="514" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" letter-spacing="0.14em">LEGEND</text>
+    <rect x="130" y="504" width="10" height="10" rx="2" fill="#ffffff" stroke="#4c526d" stroke-width="1"/>
+    <text x="146" y="513" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">module</text>
+    <rect x="220" y="504" width="10" height="10" rx="2" fill="rgba(241,132,138,0.14)" stroke="#f1848a" stroke-width="1.2"/>
+    <text x="236" y="513" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">shared contract (focal)</text>
+    <line x1="400" y1="509" x2="420" y2="509" stroke="#f1848a" stroke-width="1.2" stroke-dasharray="5,4"/>
+    <text x="428" y="513" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">forbidden import (both ways)</text>
+    <line x1="620" y1="509" x2="640" y2="509" stroke="#6f7690" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="648" y="513" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">resolve loop</text>
+  </svg>

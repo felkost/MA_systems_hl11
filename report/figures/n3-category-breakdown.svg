@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" role="img" aria-labelledby="s9e3-title s9e3-desc">
+    <title id="s9e3-title">Pass rate by golden-dataset category across three repetitions</title>
+    <desc id="s9e3-desc">Grouped bar chart of happy_path, edge_case and failure_case categories, each with three bars for repetitions 1-3, showing happy_path flat at 80% every time while failure_case swings from 50% to 0% to 25% across the same three repetitions.</desc>
+    <rect width="100%" height="100%" fill="#ffffff"/>
+
+    
+    <line x1="80" y1="380" x2="880" y2="380" stroke="#4c526d" stroke-width="1"/>
+    <line x1="80" y1="305" x2="880" y2="305" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <line x1="80" y1="230" x2="880" y2="230" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <line x1="80" y1="155" x2="880" y2="155" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <line x1="80" y1="80" x2="880" y2="80" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <text x="72" y="384" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="end">0%</text>
+    <text x="72" y="309" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="end">25%</text>
+    <text x="72" y="234" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="end">50%</text>
+    <text x="72" y="159" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="end">75%</text>
+    <text x="72" y="84" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="end">100%</text>
+
+    
+    <rect x="140" y="140" width="48" height="240" fill="rgba(76,82,109,0.16)" stroke="#4c526d" stroke-width="1"/>
+    <text x="164" y="128" fill="#4c526d" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">80%</text>
+    <rect x="196" y="140" width="48" height="240" fill="rgba(111,118,144,0.16)" stroke="#6f7690" stroke-width="1"/>
+    <text x="220" y="128" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">80%</text>
+    <rect x="252" y="140" width="48" height="240" fill="rgba(146,150,168,0.16)" stroke="#9296a8" stroke-width="1"/>
+    <text x="276" y="128" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">80%</text>
+    <text x="220" y="404" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">happy_path</text>
+    <text x="220" y="420" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">4/5 every repetition</text>
+
+    
+    <rect x="420" y="260" width="48" height="120" fill="rgba(76,82,109,0.16)" stroke="#4c526d" stroke-width="1"/>
+    <text x="444" y="248" fill="#4c526d" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">40%</text>
+    <rect x="476" y="200" width="48" height="180" fill="rgba(111,118,144,0.16)" stroke="#6f7690" stroke-width="1"/>
+    <text x="500" y="188" fill="#6f7690" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">60%</text>
+    <rect x="532" y="200" width="48" height="180" fill="rgba(146,150,168,0.16)" stroke="#9296a8" stroke-width="1"/>
+    <text x="556" y="188" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">60%</text>
+    <text x="500" y="404" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">edge_case</text>
+    <text x="500" y="420" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">2/5, 3/5, 3/5</text>
+
+    
+    <rect x="700" y="230" width="48" height="150" fill="rgba(76,82,109,0.16)" stroke="#4c526d" stroke-width="1"/>
+    <text x="724" y="218" fill="#4c526d" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">50%</text>
+    <rect x="756" y="378" width="48" height="2" fill="#f1848a"/>
+    <text x="780" y="372" fill="#f1848a" font-size="11" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">0%</text>
+    <rect x="812" y="305" width="48" height="75" fill="rgba(146,150,168,0.16)" stroke="#9296a8" stroke-width="1"/>
+    <text x="836" y="293" fill="#9296a8" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">25%</text>
+    <text x="780" y="404" fill="#2d3142" font-size="12" font-weight="600" font-family="Arial,sans-serif" text-anchor="middle">failure_case</text>
+    <text x="780" y="420" fill="#f1848a" font-size="11" font-family="Arial,sans-serif" text-anchor="middle">2/4, 0/4, 1/4 — most volatile</text>
+
+    
+    <line x1="30" y1="446" x2="870" y2="446" stroke="rgba(76,82,109,0.10)" stroke-width="0.8"/>
+    <rect x="30" y="456" width="16" height="10" rx="2" fill="rgba(76,82,109,0.16)" stroke="#4c526d" stroke-width="1"/>
+    <text x="52" y="465" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">Repetition 1</text>
+    <rect x="230" y="456" width="16" height="10" rx="2" fill="rgba(111,118,144,0.16)" stroke="#6f7690" stroke-width="1"/>
+    <text x="252" y="465" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">Repetition 2</text>
+    <rect x="430" y="456" width="16" height="10" rx="2" fill="rgba(146,150,168,0.16)" stroke="#9296a8" stroke-width="1"/>
+    <text x="452" y="465" fill="#6f7690" font-size="11" font-family="Arial,sans-serif">Repetition 3</text>
+  </svg>

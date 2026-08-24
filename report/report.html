@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MA_systems_hl11 — Final Report</title>
+<style>
+  :root{
+    --paper:#f7f2ec;
+    --paper-2:#e7d9d0;
+    --ink:#4c526d;
+    --muted:#6f7690;
+    --soft:#9296a8;
+    --rule:rgba(76,82,109,0.14);
+    --rule-solid:#c7cad6;
+    --accent:#f1848a;
+    --accent-tint:rgba(241,132,138,0.10);
+    --gold:#f4d270;
+    --gold-tint:rgba(244,210,112,0.18);
+    --sage:#cbd0a4;
+    --sage-tint:rgba(203,208,164,0.24);
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:Arial,sans-serif;
+    padding:0 0 100px;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px;}
+  header.hero{
+    background:var(--ink);
+    color:#f7f2ec;
+    padding:64px 24px 48px;
+    margin-bottom:8px;
+  }
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin:0 0 12px;
+    font-weight:700;
+  }
+  h1{
+    font-size:32px;
+    margin:0 0 16px;
+    line-height:1.25;
+    font-weight:800;
+  }
+  header.hero p.lede{
+    font-size:15px;
+    line-height:1.7;
+    max-width:680px;
+    color:#d8dbe8;
+    margin:0;
+  }
+  .headline-stat{
+    display:inline-block;
+    margin-top:28px;
+    padding:14px 20px;
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.18);
+    border-radius:6px;
+    font-size:14px;
+  }
+  .headline-stat b{font-size:20px;color:#fff;}
+  nav.toc{
+    background:var(--card);
+    border:1px solid var(--rule-solid);
+    border-radius:8px;
+    padding:20px 24px;
+    margin:32px 0 48px;
+    font-size:13px;
+  }
+  nav.toc p{margin:0 0 10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;}
+  nav.toc ol{margin:0;padding-left:20px;line-height:1.9;}
+  nav.toc a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--rule-solid);}
+  nav.toc a:hover{border-color:var(--accent);}
+  section.block{margin:56px 0;}
+  section.block h2{
+    font-size:22px;
+    margin:0 0 6px;
+    border-bottom:3px solid var(--gold);
+    padding-bottom:10px;
+  }
+  section.block > p.dek{color:var(--muted);font-size:13px;margin:0 0 24px;max-width:640px;line-height:1.6;}
+  h3{font-size:16px;margin:32px 0 10px;color:var(--ink);}
+  p{line-height:1.7;font-size:14.5px;}
+  .figure{
+    background:var(--card);
+    border:1px solid var(--rule-solid);
+    border-radius:8px;
+    padding:16px;
+    margin:20px 0;
+  }
+  .figure img{width:100%;height:auto;display:block;}
+  .figure figcaption{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:12px;
+    line-height:1.6;
+    padding-top:12px;
+    border-top:1px solid var(--rule);
+  }
+  .table-scroll{overflow-x:auto;margin:16px 0 8px;}
+  table{width:100%;min-width:480px;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--rule);}
+  th{background:var(--paper-2);color:var(--ink);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:0.03em;}
+  tr:last-child td{border-bottom:1px solid var(--rule-solid);}
+  td.num{font-variant-numeric:tabular-nums;}
+  .pass{color:#4f7942;font-weight:700;}
+  .fail{color:#c0392b;font-weight:700;}
+  .callout{
+    background:var(--sage-tint);
+    border-left:4px solid var(--sage);
+    border-radius:0 6px 6px 0;
+    padding:16px 20px;
+    margin:20px 0;
+    font-size:13.5px;
+    line-height:1.65;
+  }
+  .callout.warn{background:var(--accent-tint);border-left-color:var(--accent);}
+  .callout.gold{background:var(--gold-tint);border-left-color:var(--gold);}
+  .limits ul{padding-left:20px;line-height:1.8;font-size:13.5px;}
+  .limits li{margin-bottom:8px;}
+  code{
+    background:var(--paper-2);
+    padding:1px 5px;
+    border-radius:3px;
+    font-size:12.5px;
+  }
+  footer{
+    margin-top:64px;
+    padding-top:20px;
+    border-top:1px solid var(--rule-solid);
+    font-size:11.5px;
+    color:var(--soft);
+    max-width:900px;
+    margin-left:auto;
+    margin-right:auto;
+    padding-left:24px;
+    padding-right:24px;
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="inner">
+    <p class="eyebrow">MA_SYSTEMS_HL11 · FINAL REPORT</p>
+    <h1>A tested multi-agent research system</h1>
+    <p class="lede">Automated evaluation of a Supervisor-coordinated
+    research pipeline — a golden dataset, component-level checks, tool-use
+    correctness, and a full end-to-end evaluation with an LLM judge,
+    culminating in a three-repetition reliability measurement.</p>
+    <div class="headline-stat">
+      Current end-to-end reliability: <b>mean 18.0/26 (69.2%)</b>, range
+      65.4–73.1% across three real repeated runs
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <p>Contents</p>
+  <ol>
+    <li><a href="#system">What this system is</a></li>
+    <li><a href="#method">How it was tested</a></li>
+    <li><a href="#component">Component and tool-use quality</a></li>
+    <li><a href="#e2e">End-to-end reliability</a></li>
+    <li><a href="#limits">Known limitations</a></li>
+  </ol>
+</nav>
+
+<section class="block" id="system">
+  <h2>What this system is</h2>
+  <p class="dek">A Supervisor coordinating three specialised sub-agents through a
+  plan → research → critique loop, gated by a human approval step before
+  anything is written to disk.</p>
+
+  <p>The system answers a research question by routing it through four
+  roles. A <b>Planner</b> turns the question into a concrete search plan.
+  A <b>Researcher</b> executes that plan against a local knowledge base and
+  the live web, and drafts a cited answer. A <b>Critic</b> checks the draft
+  against the plan and either approves it or sends it back with specific,
+  actionable feedback — up to a fixed number of revision rounds. Once the
+  Critic approves, the system composes a final report and asks a human to
+  approve, edit, or reject saving it; nothing reaches disk without that
+  approval.</p>
+
+  <p>Two independent implementations of this same coordination contract
+  exist side by side in the codebase — one where the Supervisor calls each
+  sub-agent as an ordinary tool, one expressed as an explicit state graph —
+  so the same question can be run through either path and compared. Both
+  enforce the same revision cap and the same human-approval gate; neither
+  can call the other, by design, so a change to one can never silently
+  change the other's behaviour.</p>
+
+  <figure class="figure">
+    <img src="figures/architecture-overview.svg" alt="Architecture overview: the entry point routes to one of two independent coordination paths, both converging on a shared human-in-the-loop gate before anything is saved.">
+    <figcaption><b>The shared contract both coordination paths honour.</b>
+    A single entry point dispatches to either implementation by a runtime
+    flag; both are forbidden from importing each other or a module that
+    would couple them, so the comparison between the two stays meaningful.
+    Both converge on the same shared gate — the point where a human, not
+    the model, decides whether a result reaches disk.</figcaption>
+  </figure>
+
+  <p>Underneath each coordination path, the Planner, Researcher, and Critic
+  are built the same way: each is handed only the specific tools its role
+  needs (a Planner and Critic can search but never fetch a full page or
+  save a file; only the Researcher can fetch a URL; only the Supervisor can
+  save a report), and every tool call is wrapped by a middleware stack that
+  enforces retry, error-handling, and call-budget rules uniformly across
+  all three roles. The Researcher draws on two sources: a local knowledge
+  base built from a fixed document corpus (retrieved by a hybrid
+  keyword-and-embedding search, then re-ranked), and the live web. Every
+  run is traced end to end, so what actually happened — which tool was
+  called, with what arguments, returning what — can be inspected after the
+  fact rather than inferred from the final answer alone.</p>
+</section>
+
+<section class="block" id="method">
+  <h2>How it was tested</h2>
+  <p class="dek">A 15-case golden dataset, five checks per layer of the
+  system, and an LLM acting as judge where no deterministic check is
+  possible.</p>
+
+  <p>The measuring instrument is a fixed set of 15 hand-reviewed
+  questions, five in each of three categories: ordinary research questions
+  a well-functioning system should answer fully (<i>happy path</i>),
+  ambiguous or unusually narrow/broad ones that test judgement
+  (<i>edge case</i>), and questions the system should refuse or otherwise
+  handle defensively — out-of-scope requests, nonsense input, and two
+  adversarial attempts (a direct jailbreak and an indirect prompt
+  injection hidden in a fetched page) (<i>failure case</i>). Every case
+  carries a hand-written reference answer, not a mechanically generated
+  one.</p>
+
+  <p>Four layers are checked, each with its own metric and its own
+  pass/fail threshold set from a first measured baseline rather than
+  picked in advance:</p>
+
+  <ul>
+    <li><b>Component quality</b> — does the Planner produce a specific,
+    usable plan; does the Researcher's answer stay grounded in what it
+    actually retrieved; does the Critic's feedback identify real issues
+    and stay actionable. Judged by an LLM (<code>google/gemini-2.5-pro</code>),
+    each against a written rubric.</li>
+    <li><b>Tool-use correctness</b> — does each role call the tools its
+    task actually calls for, in the right order. This check is
+    deterministic (no model judges it), so its result carries no
+    judge-side variance.</li>
+    <li><b>End-to-end quality</b> — does the final answer stay relevant to
+    the question, match the reference answer's content, and cite only
+    what it actually retrieved rather than what it merely recalls. The
+    last of these is a custom rubric built for this project, since no
+    off-the-shelf metric checks citation honesty the way this system's own
+    task requires.</li>
+    <li><b>Reliability</b> — does the end-to-end result hold up across
+    repeated runs of the same 15 cases, or does it move around from one
+    run to the next.</li>
+  </ul>
+
+  <div class="figure">
+    <img src="figures/stage9a-metric-scope.svg" alt="What each end-to-end metric reads: input, actual output, expected output, retrieval context, and tools called, with different metrics reading different subsets.">
+    <figcaption><b>What each end-to-end metric actually reads.</b> The
+    citation-honesty metric is deliberately built with two different
+    strengths of check: a claim attributed to the local knowledge base is
+    checked directly against the chunk that was actually retrieved
+    (strict); a claim attributed to the web is checked only for whether a
+    web search or page fetch happened at all in that run (coarse) — this
+    system's own tracing does not yet capture what a fetched web page
+    actually said, only that the tool was called, so a hallucinated web
+    citation following a real web call would still pass. Named plainly as
+    a limitation rather than a silent gap.</figcaption>
+  </div>
+
+  <div class="figure">
+    <img src="figures/stage7-metric-scope.svg" alt="Ancestor-scoped retrieval context: only chunks retrieved by the Researcher's own tool calls count toward its groundedness score, not chunks retrieved by the Planner or Critic in the same run.">
+    <figcaption><b>Groundedness is scoped to what the Researcher itself
+    retrieved.</b> A flat, run-wide filter would credit the Researcher
+    with chunks the Planner or Critic happened to retrieve in the same
+    run — chunks the Researcher never actually saw. Tracing every tool
+    call's own ancestry (which agent, which parent call) is what keeps
+    this check honest.</figcaption>
+  </div>
+
+  <div class="figure">
+    <img src="figures/stage8-tool-correctness.svg" alt="One real run's eight tool calls scored three different ways: exact-match wrongly fails on any extra call, order-off wrongly credits a call on the wrong step, ordered matching correctly credits the run.">
+    <figcaption><b>Why tool-use correctness is checked with ordering
+    turned on, not as a bare set-membership check.</b> The same real run
+    — eight tool calls, ending in a refused save and a second, successful
+    one — is scored three ways side by side: a strict exact-match check
+    wrongly fails the run for making extra, legitimate calls; a check with
+    ordering turned off wrongly credits the run's very first refused save
+    as if it were the final, successful one; only the ordered check this
+    project actually uses gets the right answer for the right reason.</figcaption>
+  </div>
+</section>
+
+<section class="block" id="component">
+  <h2>Component and tool-use quality</h2>
+  <p class="dek">Each role does what it is asked most of the time; the one
+  structural gap is well understood, not a surprise.</p>
+
+  <div class="table-scroll">
+  <table>
+    <tr><th>What was checked</th><th>Result</th><th>Read</th></tr>
+    <tr><td>Planner produces a specific, usable plan</td><td class="pass">pass (both checks)</td><td>Consistently on target</td></tr>
+    <tr><td>Critic's feedback is specific and actionable</td><td class="pass">pass (both checks)</td><td>Consistently on target</td></tr>
+    <tr><td>Researcher's answer stays grounded in retrieved sources</td><td class="num">1 pass, 1 <span class="fail">below threshold (0.6 vs. 0.7)</span></td><td>See below — a structural gap, not a regression</td></tr>
+    <tr><td>Each role calls the right tools, in the right order</td><td class="pass">3 of 3 pass</td><td>No judge-side variance — this check is deterministic</td></tr>
+  </table>
+  </div>
+
+  <p>The one below-threshold component result has a known, structural
+  cause rather than an unexplained one: the groundedness check can only
+  compare an answer against what the local knowledge base's own search
+  returned, because nothing in this system's tracing yet captures the
+  content of a live web page it fetched — only that the fetch happened.
+  A correct, web-sourced claim is therefore counted as "ungrounded" by
+  construction, not because the Researcher invented it. This is recorded
+  as a starting baseline with a named cause, not treated as a defect to
+  patch by lowering the bar.</p>
+
+  <p>The tool-use correctness result is the most reliable of the four
+  categories in one specific sense: because it needs no judge model at
+  all, its 3-of-3 pass rate carries none of the run-to-run judge variance
+  the other categories do. Its one non-trivial case is worth naming: a
+  real run needed two revision rounds and one refused save attempt before
+  the Supervisor's save actually succeeded, and the check confirms the
+  Critic genuinely approved before that save — not merely that a
+  <code>save_report</code> call happened, since an exhausted revision
+  budget can otherwise let a save through without one.</p>
+</section>
+
+<section class="block" id="e2e">
+  <h2>End-to-end reliability</h2>
+  <p class="dek">The full pipeline was measured, diagnosed, fixed twice,
+  and then measured three times over to find out whether either fix held
+  up. It mostly did not, and that is the honest, useful result.</p>
+
+  <h3>The fix history</h3>
+  <p>The first full-pipeline baseline passed 6 of 14 scored cases (43%).
+  Every failure was read in its own trace — not just its score — and
+  sorted into named causes: the largest was the Researcher elaborating
+  past what its own retrieved sources actually supported, on two cases.
+  A revised Researcher instruction, telling it plainly to say when a
+  source does not support a claim rather than filling the gap plausibly,
+  was the first fix tried.</p>
+
+  <div class="figure">
+    <img src="figures/stage9c-before-after.svg" alt="Before and after the first fix: the two targeted cases stayed unchanged or got slightly worse, while three unrelated cases regressed and two others recovered — net movement from 6/14 to 5/14, at n=1 each side, no confidence interval.">
+    <figcaption><b>The first fix did not demonstrate the improvement it
+    targeted.</b> Re-measured on the same 15 cases: the two cases it was
+    aimed at were unchanged or slightly worse; three unrelated cases
+    regressed and two others recovered, netting 5 of 14 (down from 6).
+    At a single run each side with no confidence interval, this reads as
+    "the fix did not prove out on the cases it targeted," not "the fix
+    made the system worse" — most of the movement is ordinary run-to-run
+    variance at this sample size. The instruction was kept anyway, since
+    it is reasonable on its own terms and reverting on unproven noise
+    would itself be an unjustified reaction.</figcaption>
+  </div>
+
+  <p>That same re-measurement surfaced a second, unrelated problem: two
+  cases produced a saved "report" that was actually leftover conversation
+  text, not a report body — the Supervisor sometimes ended its turn with
+  prose instead of calling the save tool. Tracing the real run showed
+  exactly why: a refused save correctly stopped the bad write, but nothing
+  then pushed the Supervisor to try again while revision rounds remained.</p>
+
+  <div class="figure">
+    <img src="figures/stage9d-loop-nudge.svg" alt="Without a nudge, a refused save leaves the model to end its turn with prose and no report is written; with the nudge, the model is pushed back toward the critique step and a real report file lands on disk.">
+    <figcaption><b>The fix that actually worked, proven by a file on disk,
+    not a score.</b> A second nudge added after a refused save pushes the
+    model back toward the critique step while rounds remain. Checked
+    directly against the two affected cases' own saved files: both went
+    from "refused, nothing written" to a real report on disk (7,174 and
+    3,328 bytes). The overall pass rate moved from 5 to 8 of 14 — reported
+    plainly as three of those eight passes being unrelated to this fix,
+    and one previously-solid case regressing for an unrelated reason,
+    rather than claimed as a clean net gain.</figcaption>
+  </div>
+
+  <h3>The closing measurement: does either result hold up?</h3>
+  <p>Both fixes above were each checked once. A single run cannot tell a
+  real, stable improvement apart from ordinary sampling noise — so the
+  system was measured four times in total under its current
+  configuration: one checkpoint run, then three full repetitions of the
+  same 15-case, now-26-check suite (the golden-dataset cases plus the
+  component and tool-use checks, all run together).</p>
+
+  <div class="figure">
+    <img src="figures/n3-overall-trend.svg" alt="Four measurements of the same system: checkpoint 73.1%, three repetitions at 69.2%, 65.4%, and 73.1%, with a mean of 69.2% and a stated range of 65.4-73.1% — no confidence interval is drawn.">
+    <figcaption><b>The checkpoint's apparent gain does not survive repeated
+    measurement.</b> Read alone, the checkpoint's 19/26 looks like a real
+    improvement over the 18/26 every earlier configuration measured. Read
+    against the three repetitions' own range (65.4–73.1%), it sits at the
+    range's upper edge — indistinguishable from ordinary run-to-run
+    variance. No confidence interval is drawn deliberately: with only
+    three repetitions, a computed interval would imply a shape three
+    points cannot actually support, so the honest choice is a stated
+    range instead of a number that looks more precise than it is.</figcaption>
+  </div>
+
+  <p><b>Mean across the three repetitions: 18.0/26 (69.2%), range
+  65.4–73.1%.</b> Sixteen of the 26 checks pass every single time; five
+  are flaky (pass on some repetitions, fail on others); five fail every
+  time. Zero checks errored outright.</p>
+
+  <div class="figure">
+    <img src="figures/n3-per-case-heatmap.svg" alt="Heatmap of all 26 checks across three repetitions, sorted into stable pass, flaky, and stable fail.">
+    <figcaption><b>Which checks are unreliable, and which are simply
+    broken.</b> Ordinary research questions (happy-path) are close to
+    fully reliable, not perfectly so: four of the five pass every time,
+    and the fifth fails every time for the same reason named below. What
+    is flaky splits into two shapes: both adversarial attempts (a direct
+    jailbreak attempt and an indirect prompt injection hidden in a
+    fetched page) sometimes get caught and sometimes do not — the
+    defense added for the injection case reduces how often it succeeds
+    without yet preventing it outright; two more are very
+    high-tool-call-count cases, where a separate, already-diagnosed
+    pattern of tool calls issued with missing arguments shows up
+    intermittently; and one is a component-level check on a narrow,
+    corpus-ambiguous memory question, flaky in the same imprecise way —
+    sometimes the Researcher states plainly that the corpus draws no such
+    distinction, sometimes it invents one anyway. What fails every time
+    has one dominant shape: a fabrication pattern recurring across three
+    distinct cases (including the happy-path one above), where the
+    system states a distinction or a claim its own retrieved sources
+    never actually draw — plus one specific out-of-scope request (a
+    recipe request) that a since-generalised refusal rule no longer
+    reliably catches, a known, accepted trade-off rather than an
+    oversight, and the same web-citation groundedness gap named
+    above.</figcaption>
+  </div>
+
+  <div class="figure">
+    <img src="figures/n3-category-breakdown.svg" alt="Grouped bar chart: happy_path steady at 80% across all three repetitions, edge_case moving between 40% and 60%, failure_case swinging from 50% to 0% to 25% -- the most volatile category by far.">
+    <figcaption><b>Instability concentrates almost entirely in one
+    category.</b> Ordinary research questions are the one part of the
+    system with zero measured movement across all three repetitions.
+    Adversarial and defensive questions (<code>failure_case</code>) are
+    where the system's behaviour actually varies from run to run — one
+    repetition scored zero of four on this category outright — which is
+    exactly where a security-relevant defense being probabilistic rather
+    than reliable matters most.</figcaption>
+  </div>
+
+  <div class="callout warn">
+    <b>The honest bottom line.</b> Neither of the two fixes tried produced
+    a measurable, stable improvement once checked against repeated runs
+    rather than a single one. The system's current, best estimate of its
+    own reliability is a mean of 69.2% with a swing of about eight
+    percentage points run to run — a real number, reported as it was
+    measured, not smoothed into a single, falsely precise figure.
+  </div>
+
+  <h3>What would concretely move this further</h3>
+  <p>Every recurring failure and every source of run-to-run instability
+  traces back to a cause this project already diagnosed, with a concrete,
+  not-yet-implemented next step:</p>
+  <ul>
+    <li>The unsupported-claim fabrication pattern has a fix already
+    written (a stricter Critic instruction, tested and confirmed to work
+    in isolation) — it exists in the codebase but was deliberately not
+    made the default configuration this measurement runs under, so its
+    effect on the aggregate result is not yet reflected in the numbers
+    above.</li>
+    <li>The prompt-injection defense catches the injection's downstream
+    effects after the fact, but does not yet prevent the injection from
+    succeeding on the Researcher's first attempt at all — a code-level
+    check on the shape of a sub-agent's own result, rather than a prompt
+    instruction, is the next candidate.</li>
+    <li>A recurring pattern of tool calls missing required arguments,
+    invisible to every metric this project scores today, was found by a
+    separate diagnostic pass and is not yet checked by any test in the
+    scored suite.</li>
+    <li>Nothing in the system currently checks that its response is in
+    the same language as the request — one case was flagged by a
+    diagnostic-only metric for answering an English question entirely in
+    Ukrainian, invisible to every metric actually scored today.</li>
+  </ul>
+</section>
+
+<section class="block limits" id="limits">
+  <h2>Known limitations</h2>
+  <p class="dek">Stated plainly, next to every number they qualify —
+  never assumed obvious, never left for a reader to guess.</p>
+  <ul>
+    <li><b>Every score in "Component and tool-use quality" is a single
+    run (n=1) with no confidence interval.</b> A difference between two
+    single runs is a change, not a proven improvement.</li>
+    <li><b>The end-to-end reliability figure (mean 18.0/26, range
+    65.4–73.1%) is three real repetitions (n=3), reported as a mean and a
+    stated range — deliberately not a confidence interval.</b> At three
+    data points, a computed interval would imply a distribution shape
+    three points cannot support; a stated range is the honest choice
+    instead.</li>
+    <li><b>The judge model is not validated against human-labelled
+    scores.</b> Every judged number in this report is a signal for where
+    to look, not a measured ground truth.</li>
+    <li><b>Citation honesty for a web-sourced claim can only confirm that
+    a web tool was called, never what it actually returned.</b> A
+    hallucinated web citation following a real web search would still
+    pass this check.</li>
+    <li><b>The indirect prompt-injection defense reduces harm after the
+    fact; it does not yet prevent the injection from succeeding.</b> This
+    is named as an open vulnerability, not a closed one.</li>
+    <li><b>One specific out-of-scope request type (a recipe request) is
+    not reliably refused</b> by the same rule that correctly generalised
+    to catch other out-of-scope and nonsense requests — a known,
+    accepted trade-off, not an unnoticed regression.</li>
+  </ul>
+</section>
+
+</div>
+
+<footer>
+  Built at the project's own documentation stage from results already
+  measured and persisted across its own working sessions — no result on
+  this page was re-run or re-scored to produce it. Figures are exported
+  from the project's own living diagram set.
+</footer>
+
+</body>
+</html>
