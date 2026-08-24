@@ -9,7 +9,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch:
 
 jobs:
   offline:
@@ -29,22 +28,11 @@ jobs:
       # CI can honestly guarantee about this project.
       - run: pytest -q -m "not smoke and not eval"
 
-  evals:
-    name: deepeval (manual only)
-    # Never on push. The eval tier spends real money and is not
-    # deterministic; a red result from judge drift would train everyone to
-    # ignore a red CI, and then CI stops catching real breakage.
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -r requirements.txt -r requirements-dev.txt
-      - run: deepeval test run tests/
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          JUDGE_MODEL_NAME: ${{ secrets.JUDGE_MODEL_NAME }}
-          DEEPEVAL_TELEMETRY_OPT_OUT: "YES"
+  # A `deepeval test run tests/` CI job (manual-dispatch only) previously
+  # lived here. Removed at stage 9e's close, author's own decision: the
+  # eval tier's real work happens as a deliberate, cost-announced, manually
+  # orchestrated live measurement each stage (this project's own session
+  # protocol), never through CI regardless of trigger -- the dispatch-only
+  # job was never once invoked and added a permanently-"skipped" check to
+  # every PR for no benefit. `deepeval test run tests/` remains the
+  # deliverable command; it is simply run by a person, not by a workflow.
