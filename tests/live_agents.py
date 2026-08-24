@@ -1,5 +1,4 @@
-"""Runs one real sub-agent, live, for the eval-tier component tests
-(stage 7, `docs/specs/stage-7.md`).
+"""Runs one real sub-agent, live, for the eval-tier component tests.
 
 Not a test module itself (no `test_*` name, so pytest never collects it) --
 a shared helper `tests/test_planner.py`/`test_researcher.py`/`test_critic.py`
@@ -7,8 +6,8 @@ call from inside `@pytest.mark.eval` test bodies.
 
 `AGENT_SPAN_NAME`'s values must match the literal `agent.<role>` spans
 `supervisor.py`/`orchestrator.py` actually open -- pinned against drift by
-`tests/test_agent_span_names.py`. This module opens the same span itself
-(D7.2): `agent.*` spans exist nowhere inside `agents/*.py`, so a helper that
+`tests/test_agent_span_names.py`. This module opens the same span itself:
+`agent.*` spans exist nowhere inside `agents/*.py`, so a helper that
 built a sub-agent and invoked it directly, without opening this span, would
 produce a dump `retrieval_context_for_agent` can never match anything
 against -- indistinguishable from "the model never called
@@ -52,7 +51,7 @@ class LiveRun:
     """One live sub-agent invocation's rendered output and full span dump.
 
     `plan` is set only for the planner role. A caller that needs the plan's
-    own fields -- stage 8's R3b derives its expected tool set from
+    own fields -- one tool-correctness case derives its expected tool set from
     `sources_to_check` -- would otherwise have to parse them back out of the
     markdown `render_plan` produced, which would make a rendering change
     silently break an unrelated test.
@@ -83,9 +82,8 @@ def configured_for_eval(settings: Settings) -> Iterator[None]:
 def eval_settings(*, runs_dir: str, settings: Settings) -> Settings:
     """Return `settings` with its span dump redirected to `runs_dir`.
 
-    Never writes into the project's real `runs/` -- the exact pollution
-    `insights.md` records as a caught stage-5 gate-test mistake, avoided
-    here for a live eval-tier run the same way.
+    Never writes into the project's real `runs/` -- a real gate-test mistake
+    caught once and avoided here for a live eval-tier run the same way.
     """
     return settings.model_copy(update={"span_dump_dir": runs_dir})
 
@@ -100,7 +98,7 @@ def run_agent_live(role: str, agent_input: str, *, settings: Settings) -> LiveRu
     agent_input : str
         The exact text sent as the sub-agent's one `HumanMessage`. Callers
         render it through `schemas.RESEARCH_INPUT_TEMPLATE` first when they
-        want the production-shaped input (D7.13) -- this function sends
+        want the production-shaped input -- this function sends
         whatever string it is given, unmodified.
     settings : Settings
         Must already have `span_dump_dir` pointed off the project's real

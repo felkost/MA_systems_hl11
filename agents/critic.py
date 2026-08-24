@@ -6,10 +6,10 @@ tools as the Researcher, so the Critic checks facts through the same
 sources rather than only reading the Researcher's own text. Response format
 is `CritiqueResult`; the caller's `CriticVerificationMiddleware` forces at
 least one verification call before a verdict is accepted. Stateless per
-invocation: no checkpointer (D3.6), one human message in, one
+invocation: no checkpointer, one human message in, one
 `CritiqueResult` out.
 
-Ported from `MA_systems_hl10`; see `agents/planner.py` for the shared D3.2
+Ported from `MA_systems_hl10`; see `agents/planner.py` for the shared
 dependency-inversion rationale.
 """
 
@@ -60,7 +60,7 @@ def create_critic_agent(
     ----------
     settings : Settings
     tools : Sequence of BaseTool
-        Must name exactly `CRITIC_ALLOWLIST` (D3.5).
+        Must name exactly `CRITIC_ALLOWLIST`.
     model : BaseChatModel
         Built by the caller. Tests inject a scripted fake instead.
     middleware : Sequence of AgentMiddleware
@@ -72,7 +72,7 @@ def create_critic_agent(
     CompiledStateGraph
         A graph whose `invoke` result carries the parsed `CritiqueResult` in
         `result["structured_response"]`. Never constructed with a
-        checkpointer (D3.6).
+        checkpointer.
     """
     assert_allowlist(tools, CRITIC_ALLOWLIST, "critic")
 

@@ -1,4 +1,4 @@
-"""Enforces the layer table in CLAUDE.md by walking every module's imports.
+"""Enforces this project's own layer table by walking every module's imports.
 
 The table assigns a layer per file rather than per directory, because the
 assignment prescribes a flat module layout and inventing a package tree would
@@ -30,7 +30,7 @@ APPLICATION = "application"
 INTERFACE = "interface"
 OBS = "obs"
 
-# Mirrors the "Architecture" table in CLAUDE.md. A module absent from this map
+# Mirrors this project's own "Architecture" table. A module absent from this map
 # has no declared layer, which `test_every_module_has_a_declared_layer` treats
 # as a failure rather than as permission to import anything.
 LAYER_OF_MODULE: dict[str, str] = {
@@ -65,10 +65,10 @@ LAYER_OF_MODULE: dict[str, str] = {
     "evals.repeat_summary": OBS,
 }
 
-#  Stage 2 finding: a layer must be allowed to import itself. The table in
-# CLAUDE.md ("May import") never says a layer may reach its own -- an
-# omission nobody could see at stage 0, when this dict was written and no
-# code existed yet. The first real modules (config.py -> paths.py, both
+# A layer must be allowed to import itself. The table's own "May import"
+# wording never said a layer may reach its own -- an omission nobody could
+# see when this dict was first written and no code existed yet. The first
+# real modules (config.py -> paths.py, both
 # kernel; retriever.py -> models.py, both infra; tools.py -> retriever.py,
 # both infra) all need a same-layer import, so each set below now includes
 # its own layer explicitly.
@@ -90,11 +90,10 @@ BIDIRECTIONAL_FORBIDDEN_PAIRS: tuple[tuple[str, str], ...] = (
 )
 
 # Pairs forbidden in **one** direction only: a sub-agent must never import a
-# coordinator (CLAUDE.md, Invariants -- "agents/* must never import
+# coordinator (this project's own invariant: "agents/* must never import
 # supervisor or orchestrator"), which would invert the dependency arrow the
 # whole agent-as-tool/StateGraph design rests on. The reverse import is not
-# just permitted but required -- stage 4 audit finding, D4.22
-# (docs/specs/stage-4.md): the first version of this test (stage 0, written
+# just permitted but required. The first version of this test (written
 # before either coordinator existed) checked both directions for these pairs
 # too, which would have forbidden supervisor.py/orchestrator.py from ever
 # calling `create_planner_agent`/`create_research_agent`/`create_critic_agent`
@@ -167,8 +166,9 @@ def _imported_project_modules(path: Path) -> set[str]:
 def test_every_module_has_a_declared_layer() -> None:
     """A new module must be added to the table before it may import anything.
 
-    Catching this here rather than at review time is what stops the table in
-    CLAUDE.md from quietly falling behind the tree it describes.
+    Catching this here rather than at review time is what stops this
+    project's own architecture table from quietly falling behind the tree
+    it describes.
     """
     undeclared = [
         _module_name(path)
@@ -176,7 +176,7 @@ def test_every_module_has_a_declared_layer() -> None:
         if _module_name(path) not in LAYER_OF_MODULE
     ]
     assert not undeclared, (
-        f"modules missing from LAYER_OF_MODULE (and from CLAUDE.md's "
+        f"modules missing from LAYER_OF_MODULE (and from this project's own "
         f"architecture table): {undeclared}"
     )
 
@@ -212,10 +212,9 @@ def test_bidirectional_forbidden_pairs_never_import_each_other(
         path = PROJECT_ROOT / f"{importer.replace('.', '/')}.py"
         if not path.exists():
             continue
-        assert forbidden not in _imported_project_modules(path), (
-            f"{importer} imports {forbidden}; they must stay independent "
-            "(see CLAUDE.md, Invariants)"
-        )
+        assert forbidden not in _imported_project_modules(
+            path
+        ), f"{importer} imports {forbidden}; they must stay independent"
 
 
 @pytest.mark.parametrize(
@@ -224,16 +223,15 @@ def test_bidirectional_forbidden_pairs_never_import_each_other(
 def test_sub_agents_never_import_a_coordinator(
     sub_agent: str, coordinator: str
 ) -> None:
-    """A sub-agent must never import `supervisor`/`orchestrator` (CLAUDE.md,
-    Invariants) -- the reverse import is not checked here because it is
-    required: a coordinator's only way to obtain a compiled sub-agent graph
-    is `create_planner_agent`/`create_research_agent`/`create_critic_agent`,
-    all defined in `agents.*` (D4.22, `docs/specs/stage-4.md` -- stage 0's
-    original bidirectional check would have forbidden the architecture it
-    was meant to protect).
+    """A sub-agent must never import `supervisor`/`orchestrator` -- the
+    reverse import is not checked here because it is required: a
+    coordinator's only way to obtain a compiled sub-agent graph is
+    `create_planner_agent`/`create_research_agent`/`create_critic_agent`,
+    all defined in `agents.*` (this test's own original bidirectional check
+    would have forbidden the architecture it was meant to protect).
 
     Passing vacuously while `sub_agent`'s module exists but reads nothing
-    from `coordinator` is the normal case at every stage; it stays
+    from `coordinator` is the normal early-project case; it stays
     meaningful once `supervisor.py`/`orchestrator.py` exist because an
     accidental upward import would now be a real, checkable violation.
     """
@@ -242,5 +240,5 @@ def test_sub_agents_never_import_a_coordinator(
         return
     assert coordinator not in _imported_project_modules(path), (
         f"{sub_agent} imports {coordinator}; a sub-agent must never import a "
-        "coordinator (see CLAUDE.md, Invariants)"
+        "coordinator"
     )

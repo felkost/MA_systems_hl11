@@ -1,13 +1,13 @@
 """`config.py` must put the cache-location variables into `os.environ` itself.
 
-Stage 0 measured that pydantic-settings parses `.env` into `Settings` and
+Measured directly: pydantic-settings parses `.env` into `Settings` and
 exports nothing: Hugging Face and pip read `os.environ` and nothing else, so
 without an explicit write the model cache lands wherever the ambient
 environment says -- which on a fresh machine can be `C:\\Users\\...`, the one
-place CLAUDE.md's Forbidden list bans it from.
+place this project bans a cache from landing.
 
 This runs the check in a **child process** with a deliberately hostile
-ambient environment, not in-process: stage 0's own finding was that the rule
+ambient environment, not in-process: a real finding was that the rule
 looked satisfied only because this machine's ambient `HF_HOME` already
 happened to point off the system drive. Asserting from the current process
 would repeat exactly that mistake.
@@ -61,7 +61,7 @@ def test_config_exports_cache_paths_to_environ(tmp_path: Path) -> None:
     assert "hostile" not in deepeval_home
 
 
-# -- Stage 9e, D9e.1 -- the judge's per-task timeout, a DELIBERATE exception
+# -- the judge's per-task timeout, a DELIBERATE exception
 # to the pattern above. Two tests asserting OPPOSITE things, not the same
 # pattern the three cache variables above share: those three exist
 # specifically so that an ambient value can never outrank the project's own
@@ -119,7 +119,7 @@ def test_deepeval_timeout_field_lets_an_ambient_override_win(tmp_path: Path) -> 
 def test_export_deepeval_timeout_override_reaches_deepevals_own_settings(
     tmp_path: Path,
 ) -> None:
-    """The artefact D9e.1 names: the exported key is DeepEval's own
+    """The artefact this invariant names: the exported key is DeepEval's own
     suffixed override variable, and DeepEval's effective per-task timeout
     (not just the raw field) reflects it."""
     env = _hostile_env(tmp_path)

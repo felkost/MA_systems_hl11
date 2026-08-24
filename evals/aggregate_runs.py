@@ -1,11 +1,12 @@
 """Snapshot and merge DeepEval's own persisted run file across more than one
-`deepeval test run` invocation (stage 9e, D9e.2a).
+`deepeval test run` invocation.
 
 The second `deepeval test run` **overwrites**
-`.deepeval/.latest_run_full.json` -- stage 9d merged three such files by
+`.deepeval/.latest_run_full.json` -- a real repetition once merged three
+such files by
 hand into one report, and no code in this repository did it. Without this
 module the `Overall: N/26` line does not exist at all after the second
-invocation, and six of stage 9e's own nine go/no-go criteria assume it does.
+invocation, and several of this project's own go/no-go criteria assume it does.
 
 No intermediate merged-JSON schema is invented: `merge_runs` concatenates
 `testCases` **in memory** and hands the result straight to
@@ -39,8 +40,7 @@ def snapshot_latest_run(eval_run_id: str, label: str) -> Path:
     eval_run_id : str
     label : str
         Names this invocation in the snapshot's own filename, e.g. `"e2e"`
-        or `"components"` -- the two invocations D9e.11/D9e.12 name for one
-        repetition.
+        or `"components"` -- the two invocations one repetition names.
 
     Returns
     -------
@@ -64,15 +64,15 @@ def collect_invocation_artefacts(
     target_eval_run_id: str, source_eval_run_id: str
 ) -> int:
     """Fold one invocation's own `case-costs.jsonl` and `spans/` into
-    `target_eval_run_id`'s directory (stage 9e phase 1b).
+    `target_eval_run_id`'s directory.
 
     `snapshot_latest_run` handles DeepEval's own run file, which is the only
     artefact that gets *overwritten* by the next invocation. These two are a
     different problem with the same root: `eval_run_id` is a session-scoped
     pytest fixture minting a fresh `uuid4()` per invocation, with no CLI
     override, so a second `deepeval test run` writes its costs and spans
-    under a directory of its own rather than beside the first's. Phase 1b
-    bridged that by hand (`cat >>`, `cp`); at n=3 that is six manual steps,
+    under a directory of its own rather than beside the first's. This was once
+    bridged by hand (`cat >>`, `cp`); at n=3 that is six manual steps,
     each one a chance to publish a cost total missing half its rows.
 
     Idempotent on the spans (a re-copy overwrites the same filenames), but

@@ -1,5 +1,4 @@
-"""A minimal local HTTP server exposing `evals/fixtures/` (stage 9a,
-`docs/specs/stage-9a.md` D9a.1).
+"""A minimal local HTTP server exposing `evals/fixtures/`.
 
 Not a test module (no `test_*` name, so pytest never collects it) -- the
 one golden-dataset case that needs a real, fetchable URL for `read_url`

@@ -1,4 +1,4 @@
-"""Shared offline test doubles for stage 3's agent and middleware tests.
+"""Shared offline test doubles for the agent and middleware tests.
 
 `FakeToolCallingModel` is the same shape both donor projects use to test
 agent factories without a network call: it accepts `bind_tools` (called

@@ -1,5 +1,4 @@
-"""`main.py`: the REPL driving loop over both coordination paths
-(`docs/specs/stage-4.md`).
+"""`main.py`: the REPL driving loop over both coordination paths.
 
 Every test injects a fake `save_report` -- `main.run_session` otherwise
 defaults to the real tool, which writes to `output/`.
@@ -306,10 +305,9 @@ def test_build_graph_selects_supervisor_or_orchestrator(monkeypatch: Any) -> Non
     assert supervisor_graph is not graph_graph
 
 
-# -- Stage 5, D5.7: each turn opens its own "repl.question" span with a
+# -- each turn opens its own "repl.question" span with a
 # fresh run_id, via OTel Baggage + RunIdStampingProcessor -- not a
-# configure_observability() parameter (that draft was unbuildable, see
-# docs/specs/stage-5.md's "corrected" note on D5.7).
+# configure_observability() parameter (that draft was unbuildable).
 
 
 def test_run_session_opens_one_repl_question_span_per_turn_with_a_fresh_run_id(

@@ -1,18 +1,17 @@
 """Owns the process's one `TracerProvider`, the offline span dump, rotating
-file logs, and cost computed from token counts (stage 5,
-`docs/specs/stage-5.md`).
+file logs, and cost computed from token counts.
 
 **One provider, two processors.** `configure_observability` builds exactly
 one `TracerProvider` and attaches `LangfuseSpanProcessor` (via
 `Langfuse(tracer_provider=...)`, only when `settings.tracing_enabled`) and a
-project-owned `SpanJsonExporter` on a `SimpleSpanProcessor` (D5.4). The
+project-owned `SpanJsonExporter` on a `SimpleSpanProcessor`. The
 offline dump is deliberately **not** a `BatchSpanProcessor`: it writes each
 span synchronously as it ends, so a hard crash never loses its tail --
 Langfuse export staying batched (and therefore losing an unflushed tail on a
 crash) is accepted, since it is best-effort UI-quality tracing, never the
 evaluation pipeline's data source.
 
-**`run_id` is not a constructor argument (D5.7, corrected mid-spec-review).**
+**`run_id` is not a constructor argument.**
 The first draft took `run_id` at `configure_observability()` call time, which
 cannot work: the provider is built once per process, while `run_id` is fresh
 per REPL turn. Instead, `run_id` rides OpenTelemetry's own `Baggage` --
@@ -28,8 +27,8 @@ turn's value, no cross-contamination.
 **Only `main.py` (interface) imports this module.** Every other layer
 reaches OpenTelemetry's own ambient global tracer directly
 (`opentelemetry.trace.get_tracer(__name__)`), a third-party import invisible
-to `tests/test_layering.py`'s AST walk over project-local module names
-(D5.3) -- this module never crosses the `application`/`infra` boundary that
+to `tests/test_layering.py`'s AST walk over project-local module names --
+this module never crosses the `application`/`infra` boundary that
 would otherwise forbid importing an `obs`-layer module from there.
 """
 
@@ -73,7 +72,7 @@ class ObservabilityHandle:
 
     def shutdown(self) -> None:
         """Flush every registered `SpanProcessor`, including the batched
-        Langfuse one, before the process exits (D5.11)."""
+        Langfuse one, before the process exits."""
         self.tracer_provider.shutdown()
 
 
@@ -93,7 +92,7 @@ def configure_observability(settings: Settings) -> ObservabilityHandle:
     RuntimeError
         On a second call in the same process. OpenTelemetry's own
         `set_tracer_provider` silently no-ops on a second call rather than
-        raising (measured live, D5.13) -- this project enforces what the
+        raising (measured live) -- this project enforces what the
         SDK does not, so a caller bug (e.g. `main()` re-entered) is loud
         rather than silently inert.
     """
@@ -108,7 +107,7 @@ def configure_observability(settings: Settings) -> ObservabilityHandle:
     provider = TracerProvider(sampler=sampler)
     trace.set_tracer_provider(provider)
 
-    # First, so every later processor sees `run_id` already stamped (D5.7).
+    # First, so every later processor sees `run_id` already stamped.
     provider.add_span_processor(RunIdStampingProcessor())
 
     runs_dir = settings.span_dump_dir or "runs"
@@ -136,7 +135,7 @@ def configure_observability(settings: Settings) -> ObservabilityHandle:
             # for a different underlying reason (a default filter, not a
             # LangChain-integration-only publisher). Fixed by accepting
             # every span this project's own provider ever sees: nothing
-            # else is attached to it (D5.3), so there is nothing to filter
+            # else is attached to it, so there is nothing to filter
             # out.
             should_export_span=lambda span: True,
         )
@@ -148,7 +147,7 @@ class RunIdStampingProcessor(SpanProcessor):
     """Copies the ambient `Baggage` "run_id" value onto every span's own
     attributes at creation time -- registered first in the provider's
     processor list so both the Langfuse and offline-dump processors see it
-    already set (D5.7). A future edit that reorders `add_span_processor`
+    already set. A future edit that reorders `add_span_processor`
     calls ahead of this one silently loses `run_id` on every span; pinned
     by a declared test constructing the provider with processors added out
     of order."""
@@ -172,7 +171,7 @@ class SpanJsonExporter(SpanExporter):
     """Writes each ended span into `runs/<run_id>/spans.json`, keyed by the
     span's own `run_id` attribute (stamped by `RunIdStampingProcessor`) --
     one long-lived exporter for the whole process, never bound to a single
-    fixed run at construction (D5.7, corrected).
+    fixed run at construction.
 
     `SimpleSpanProcessor.on_end` calls `export()` once per single span
     (measured: `opentelemetry-sdk`'s `SimpleSpanProcessor` is synchronous,

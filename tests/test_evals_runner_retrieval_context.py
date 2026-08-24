@@ -1,7 +1,7 @@
 """`retrieval_context_for_agent` -- ancestor-scoped `retrieval.chunks`
-extraction (stage 7, D7.1/D7.2).
+extraction.
 
-Adversarial review of `docs/specs/stage-7.md` found this design decision
+Adversarial review found this design decision
 the hard way: a flat `name == "tool.knowledge_search"` filter over a real
 run (`runs/0e9d703a-.../spans.json`) returns chunks belonging to the
 Planner alongside the Researcher's own, and a second real run
@@ -147,7 +147,7 @@ def test_knowledge_search_span_with_no_chunks_attribute_contributes_nothing() ->
 
 
 def test_read_url_span_counts_as_retrieval_symmetrically() -> None:
-    # Stage 9e, D9e.7's third lever: `read_url` now writes retrieval.chunks
+    # `read_url` writes retrieval.chunks
     # (tools.py), so a page a real tool fetched grounds the same way a
     # knowledge_search hit does.
     spans = [
@@ -173,7 +173,7 @@ def test_knowledge_search_and_read_url_chunks_combine_in_span_order() -> None:
 
 
 def test_web_search_span_never_counts_as_retrieval() -> None:
-    # A search snippet is not a retrieved document (D9e.7's own scoping
+    # A search snippet is not a retrieved document (this project's own scoping
     # decision) -- web_search stays excluded even if it carried the same
     # attribute name by accident.
     spans = [

@@ -1,10 +1,9 @@
-"""hl8's registry mechanism carrying hl10's prompt text
-(`docs/specs/stage-3.md`, "Why the prompt text must be hl10's").
+"""hl8's registry mechanism carrying hl10's prompt text.
 
 hl8's own prompt text is wrong for this project on two counts checked here:
 it instructs the Researcher to call a tool this project removed
 (`graph_search`), and its Supervisor prompt has no out-of-scope path for
-D3.3's `in_scope` field to be read by. Both are pinned as standing rules,
+the `in_scope` field to be read by. Both are pinned as standing rules,
 not one-time review comments.
 """
 
@@ -40,7 +39,7 @@ def test_planner_prompt_p1_and_p2_both_registered() -> None:
 
 
 def test_planner_prompt_p2_adds_the_incoherence_criterion() -> None:
-    # D9e.8 (`p2`): the only genuinely new content over p1 is treating an
+    # (`p2`): the only genuinely new content over p1 is treating an
     # incoherent request (gibberish, no identifiable topic) as out of scope
     # -- "judging scope is a decision to make immediately" is already in p1
     # verbatim, so it is not what distinguishes p2.
@@ -51,7 +50,7 @@ def test_planner_prompt_p2_adds_the_incoherence_criterion() -> None:
 
 
 def test_planner_prompt_p2_no_longer_names_the_golden_recipe_example() -> None:
-    # D9e.9: the borscht example is generalised away -- it matched
+    # the borscht example is generalised away -- it matched
     # edge-out-of-scope-recipe's own subject verbatim, which is teaching to
     # the test rather than illustrating the rule.
     p1 = build_planner_prompt("p1")
@@ -102,7 +101,7 @@ def test_supervisor_prompt_s1_and_s2_both_registered() -> None:
 
 
 def test_supervisor_prompt_s2_adds_the_no_fabricated_findings_rule() -> None:
-    # Pre-phase-4 finding (`insights.md`, `docs/specs/stage-9e.md`): a real
+    # A real
     # run showed the Supervisor receive an obviously broken research result
     # ("INJECTED") and silently invent a plausible-sounding replacement
     # rather than flagging it. `s2` adds the rule against that.
@@ -124,7 +123,7 @@ def test_critic_prompt_c1_and_c2_both_registered() -> None:
 
 
 def test_critic_prompt_c3_adds_the_well_evidenced_absence_rule() -> None:
-    # D9e.7 (`c3`): the only new content over c2 is the rule that a
+    # (`c3`): the only new content over c2 is the rule that a
     # well-evidenced absence counts as completeness, not a gap -- discounted
     # by the second clause ("name a source"), already present in c2.
     c2 = " ".join(build_critic_prompt("c2", today=date(2026, 8, 22)).split())
@@ -135,7 +134,7 @@ def test_critic_prompt_c3_adds_the_well_evidenced_absence_rule() -> None:
 
 def test_critic_prompt_c3_keeps_c2s_verdict_boolean_coupling_rule() -> None:
     # c3 must not silently drop the rule Critique Quality's own GEval steps
-    # measure against (D3.4) while adding the absence-is-completeness rule.
+    # measure against while adding the absence-is-completeness rule.
     c3 = build_critic_prompt("c3", today=date(2026, 8, 22))
     assert "never an APPROVE alongside an unresolved gap" in c3
 
@@ -159,7 +158,7 @@ def test_researcher_prompt_r2_warns_against_filling_gaps_with_guesses() -> None:
 
 
 def test_composer_prompt_is_a_separate_registry_from_the_supervisor() -> None:
-    # D4.4: a composer prompt must not be reachable through
+    # a composer prompt must not be reachable through
     # `build_supervisor_prompt` -- registering it in `s*` would let
     # `SUPERVISOR_PROMPT_VERSION="w1"` hand the agent-as-tool Supervisor a
     # composer prompt with no delegation rules.

@@ -7,14 +7,13 @@ unregistered version is a hard error, never a silent fallback to whatever
 version happens to be registered.
 
 The registry mechanism is `MA_systems_hl8`'s (`p*`/`r*`/`c*`/`s*`,
-`build_*_prompt(version)`); the prompt text is `MA_systems_hl10`'s
-(`docs/specs/stage-3.md`, "Why the prompt text must be hl10's"). hl8's own
+`build_*_prompt(version)`); the prompt text is `MA_systems_hl10`'s. hl8's own
 text is wrong for this project on two counts: its Researcher prompt
 instructs a `graph_search` call for a tool this project removed, and its
-Supervisor prompt has no path for the Planner's `in_scope` refusal (D3.3) to
+Supervisor prompt has no path for the Planner's `in_scope` refusal to
 be read by anyone. hl10's `SUPERVISOR_PROMPT` rule 1a supplies that path;
 its tool names (`delegate_to_planner`, ...) are renamed to this project's
-own (`plan`/`research`/`critique`/`save_report`, matching CLAUDE.md's
+own (`plan`/`research`/`critique`/`save_report`, matching this project's
 `supervisor.py` row and hl8's `_S1`).
 
 Tool names are written as literal strings, not interpolated from
@@ -460,17 +459,17 @@ def build_supervisor_prompt(version: str) -> str:
 def build_composer_prompt(version: str) -> str:
     """Look up the graph path's report-composer prompt by version.
 
-    A separate registry from `SUPERVISOR_PROMPTS`, not a second entry in it
-    (`docs/specs/stage-4.md`, D4.4): `s*` holds interchangeable versions of
-    the agent-as-tool Supervisor's *own* prompt, selected by one
-    `Settings.supervisor_prompt_version` field. Registering a composer
-    prompt there would let `SUPERVISOR_PROMPT_VERSION` point the
-    agent-as-tool Supervisor at a prompt with no `plan`/`research`/
-    `critique` delegation rules.
+     A separate registry from `SUPERVISOR_PROMPTS`, not a second entry in it
+    : `s*` holds interchangeable versions of
+     the agent-as-tool Supervisor's *own* prompt, selected by one
+     `Settings.supervisor_prompt_version` field. Registering a composer
+     prompt there would let `SUPERVISOR_PROMPT_VERSION` point the
+     agent-as-tool Supervisor at a prompt with no `plan`/`research`/
+     `critique` delegation rules.
 
-    See Also
-    --------
-    build_planner_prompt : Same lookup contract.
+     See Also
+     --------
+     build_planner_prompt : Same lookup contract.
     """
     return _lookup("composer", COMPOSER_PROMPTS, version)
 
