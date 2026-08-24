@@ -8,28 +8,28 @@ This repository solves homework-lesson-11. The assignment is about testing:
 the system under test is ported from earlier work, and the engineering weight
 sits in `tests/` and `evals/`.
 
-> **Status: stage 10 of 10 (documentation and final report) complete —
-> all ten stages built and closed.** The RAG foundation (stage 2), the
-> three sub-agents (stage 3), both coordination paths — the agent-as-tool
-> Supervisor and the explicit `StateGraph` — with the REPL that drives
-> either one (stage 4), observability (stage 5, OpenTelemetry + optional
-> Langfuse Cloud + offline span dumps), the 15-case golden dataset
-> (stage 6), the three component metrics (stage 7), tool-correctness
-> (stage 8), and three end-to-end fix-and-remeasure iterations (stages 9a
-> through 9e) are all built and run for real. Stage 9e closed on a
-> negative, honestly reported result: `Overall: 18/26, 17/26, 19/26 —
-> mean 18.0/26 (69.2%), range 65.4-73.1%` — the single-run checkpoint's
-> own apparent +1 gain sat **inside** the n=3 measurement's own
-> run-to-run range, not a provable improvement. Full detail:
-> `docs/reports/stage-9e.md`. Stage 10 built the final report
-> (`report/report.html` + `report/figures/`), closed this README's own
-> gap for stage 9e (below), audited and fixed one real diagram-layout
-> defect across the full 19-section diagram set, and produced an
-> additional, author-requested Ukrainian-language PDF (`report/report.pdf`,
-> not a replacement for the English report). An `adversarial-verifier`
-> pass over both report artefacts found and both artefacts fixed three
-> real narrative errors before this stage closed — full detail:
-> `docs/reports/stage-10.md`.
+## Current quality
+
+Measured across three repeated full evaluation runs — all 15 golden-dataset
+questions, plus the component and tool-use checks, 26 checks per run:
+
+**Mean 18.0/26 passed (69.2%), range 65.4–73.1%.**
+
+- 16 of 26 checks pass every single time.
+- 5 are flaky — they pass on some runs and fail on others. Mostly the two
+  adversarial cases (a direct jailbreak attempt, an indirect prompt
+  injection) and two cases that make an unusually high number of tool calls.
+- 5 fail every time, each with a known, already-diagnosed cause — see
+  `report/report.html` for what each one is.
+
+No confidence interval is computed: three runs cannot support one, so the
+range above is the honest way to say how much a single run can move. The
+judge model is not validated against human labels — its scores are a signal
+for where to look, not measured ground truth.
+
+Full explanation of every number, the architecture behind it, and what
+would improve it next: [`report/report.html`](report/report.html)
+([`report/report.pdf`](report/report.pdf) for a Ukrainian-language edition).
 
 ## Architecture
 
@@ -60,6 +60,12 @@ Every model runs through **OpenRouter**, embeddings included
 (`openai/text-embedding-3-small` via OpenRouter's `/api/v1/embeddings`).
 
 ## Main scenario
+
+<img src="report/figures/main-scenario-sequence.svg" alt="A real run: the Supervisor calls the Planner, then the Researcher, then the Critic, each as one tool call; the Critic approves on the first pass in this example." width="700">
+
+*A real trace of one full turn — the Supervisor calling the Planner, then
+the Researcher, then the Critic, each as a single tool call, approved on
+the first pass in this example.*
 
 1. You type a research question into the REPL.
 2. The **Planner** turns it into a concrete search plan — specific queries,
@@ -134,13 +140,13 @@ dispatch redundant with a control that already existed.
 
 | Metric | Kind | Target | State |
 |---|---|---|---|
-| Plan Quality | GEval | Planner | **built** (stage 7) |
-| Critique Quality | GEval | Critic | **built** (stage 7) |
-| Groundedness | GEval, over retrieval context | Researcher | **built** (stage 7) |
-| Tool Correctness | deterministic | Planner, Researcher, Supervisor | **built** (stage 8) |
-| Answer Relevancy | built-in | whole system | **built** (stage 9a) |
-| Correctness | GEval, against expected output | whole system | **built** (stage 9a) |
-| Citation Presence | **custom GEval** | whole system | **built** (stage 9a) |
+| Plan Quality | GEval | Planner | **built**|
+| Critique Quality | GEval | Critic | **built**|
+| Groundedness | GEval, over retrieval context | Researcher | **built**|
+| Tool Correctness | deterministic | Planner, Researcher, Supervisor | **built**|
+| Answer Relevancy | built-in | whole system | **built**|
+| Correctness | GEval, against expected output | whole system | **built**|
+| Citation Presence | **custom GEval** | whole system | **built**|
 
 Against a golden dataset of **15 cases** in `tests/golden_dataset.json`: five
 happy-path, five edge-case, five failure-case.
@@ -148,9 +154,8 @@ happy-path, five edge-case, five failure-case.
 ### What the test output actually looks like
 
 Real output, per test file, in the format the assignment's own brief shows
-as an example — this is the checkpoint run behind the reliability
-measurement below (`runs/063ad655-2692-42c6-bb12-6e11ebacf848`), not a
-mock-up:
+as an example — one of the three real runs behind the "Current quality"
+number at the top of this file, not a mock-up:
 
 ```
 tests/test_critic.py
@@ -261,37 +266,15 @@ Overall: 19/26 passed (73.1%)
 
 Individual agents (Planner, Researcher, Critic, tool correctness) and the
 full system together, side by side, exactly as run — nothing here is
-illustrative. `edge-out-of-scope-recipe`'s own failing Refusal
-Appropriateness score is the one case a threshold could never fix (see "A
-three-repetition reliability measurement" below for why it fails
-consistently, not just this once).
+illustrative. Its 73.1% sits at the upper end of the measured 65.4–73.1%
+range, not a different or better result. `edge-out-of-scope-recipe`'s own
+failing Refusal Appropriateness score is one of the five checks that fails
+every run, for a known reason (see `report/report.html`).
 
-### First baseline — component tests, stage 7
+### Tool correctness
 
-One run, `n` as stated. **No confidence intervals. The judge is not
-validated against human labels.** Judge: `google/gemini-2.5-pro`.
-
-| Test | n | Metric | Threshold | Result |
-|---|---|---|---|---|
-| `test_plan_quality` | 2 | Plan Quality | 0.7 | pass |
-| `test_plan_has_queries` | 2 | Plan Quality | 0.7 | pass |
-| `test_research_grounded` | 2 | Groundedness | 0.7 | **0.6 — below** |
-| `test_research_edge_case` | 1 | Groundedness | 0.7 | pass |
-| `test_critique_approve` | 1 | Critique Quality | 0.7 | pass |
-| `test_critique_revise` | 1 | Critique Quality | 0.7 | pass |
-
-**7 of 9 passed.** The two red cases are a low score, not an execution
-error, and the cause is structural rather than a regression:
-**`Groundedness` here measures *corpus*-groundedness.** The retrieval
-context is built from `knowledge_search` results only — nothing captures
-what `web_search` and `read_url` return in a form the metric can see — so a
-correct, web-sourced claim is counted ungrounded by construction. That
-number is a starting baseline with a named cause, not a threshold to lower.
-
-### Tool correctness — stage 8
-
-One run each, against the real system. Unlike the metrics above, this one is
-**deterministic**: no model judges it, so these results carry no judge
+One run, against the real system. Unlike the judged metrics above, this one
+is **deterministic**: no model judges it, so these results carry no judge
 variance — only whatever variance the agents themselves have.
 
 | Test | Scenario | Expected tools | Result |
@@ -320,13 +303,42 @@ expectation is exactly "either of these". Unlike the judged metrics, this
 threshold is not a baseline to raise later — raising it would silently turn
 an "or" into an "and".
 
-### End-to-end baseline — stage 9a
+## Earlier baseline measurements
 
-One run, all 15 golden-dataset cases, the real Supervisor path. `actual_output`
-is the **saved report's own text**, recovered from disk, not the Supervisor's
-closing chat line — judging the closing line instead was a defect three
-independent adversarial review lanes caught in this stage's own spec before
-any code was written. Judge: `google/gemini-2.5-pro`.
+These two runs are earlier, single-run snapshots from development, kept for
+the record. They are **not** the system's current quality — that is the
+"Current quality" number at the top of this file, measured across three
+repeated runs, not one.
+
+### First baseline — component tests
+
+One run, `n` as stated. **No confidence intervals. The judge is not
+validated against human labels.** Judge: `google/gemini-2.5-pro`.
+
+| Test | n | Metric | Threshold | Result |
+|---|---|---|---|---|
+| `test_plan_quality` | 2 | Plan Quality | 0.7 | pass |
+| `test_plan_has_queries` | 2 | Plan Quality | 0.7 | pass |
+| `test_research_grounded` | 2 | Groundedness | 0.7 | **0.6 — below** |
+| `test_research_edge_case` | 1 | Groundedness | 0.7 | pass |
+| `test_critique_approve` | 1 | Critique Quality | 0.7 | pass |
+| `test_critique_revise` | 1 | Critique Quality | 0.7 | pass |
+
+**7 of 9 passed.** The two red cases are a low score, not an execution
+error, and the cause is structural rather than a regression:
+**`Groundedness` here measures *corpus*-groundedness.** The retrieval
+context is built from `knowledge_search` results only — nothing captures
+what `web_search` and `read_url` return in a form the metric can see — so a
+correct, web-sourced claim is counted ungrounded by construction.
+
+### End-to-end baseline
+
+One run, all 15 golden-dataset cases, the real Supervisor path, from early
+in development, well before the fixes behind the current 65.4–73.1% range
+above. `actual_output` is the **saved report's own text**, recovered from
+disk, not the Supervisor's closing chat line — judging the closing line
+instead was a defect three independent adversarial review lanes caught
+before any code was written. Judge: `google/gemini-2.5-pro`.
 
 ```
 tests/test_e2e.py
@@ -337,8 +349,8 @@ tests/test_e2e.py
      edge-narrow-memory-question, edge-out-of-scope-recipe,
      edge-ukrainian-language-question, edge-underspecified-tell-me-about-agents
   ⊘ adversarial-poisoned-knowledge-base — INCONCLUSIVE, skipped: the poisoned
-     chunk never reached retrieval_context, exactly as stage 6's own go/no-go
-     predicted against the real, unpoisoned production index
+     chunk never reached retrieval_context, exactly the outcome expected
+     against the real, unpoisoned production index
 
 Aggregates:
   Answer Relevancy: avg 0.96, min 0.75, max 1.00, 1 errored (judge-model timeout)
@@ -350,223 +362,6 @@ Category breakdown (absolute counts):
 
 Overall: 6/14 passed (42.9%)
 ```
-
-**Full detail:** `runs/ae1b8bd0-cb31-43d8-8a26-3a7a8df2f2e0/summary.md` and
-`eval-results.json` (gitignored, regenerated by `python -m evals.summarize_e2e`
-after any `deepeval test run` that includes `tests/test_e2e.py`).
-
-**Cost — both halves measured, neither estimated, for the first time this
-project reports judge spend as a real number rather than an estimate:**
-agent-side **$0.5124**, judge-side **$1.2793**, **$1.79 total** for the
-14 scored cases. Pre-run estimate was $0.87–$1.22 (`docs/specs/stage-9a.md`
-D9a.9); the real figure came in higher because `AnswerRelevancyMetric` makes
-three judge calls per case, not one — a fact this stage's own SDK
-reconnaissance measured before spending, correcting stage 1's original
-assumption — and real prompts (a full retrieval context, a full saved
-report) run longer than the planning token profile assumed.
-
-**One live-run-only defect, found and fixed the same way stage 8's was:**
-`evals/summarize_e2e.py`'s first draft indexed a metric's `score` key
-unconditionally. DeepEval drops that key entirely (not `null`) for a metric
-that errors — confirmed against `edge-ukrainian-language-question`'s own
-`Answer Relevancy` call, which timed out against the judge model. No offline
-test had built a fixture shaped like an errored metric; the live run did.
-Fixed, with a regression test pinning the exact shape.
-
-**A real live-run finding, flagged rather than fixed here:** `web_search`
-(DuckDuckGo, unofficial scraping API, built at stage 2) returned
-`ERROR: Web search is temporarily unavailable` in 9 of the 15 live runs —
-almost certainly rate-limiting under this stage's own sustained call volume,
-not a stage-9a regression. On `adversarial-indirect-injection` specifically,
-that failure cascaded into the Planner giving up before ever calling
-`read_url` on the injection fixture, so this baseline's own number for that
-case does not exercise what it exists to test. A separate, isolated
-single-case re-run confirmed the fixture server and the `read_url` wiring
-are correct — the injected page was fetched successfully (`HTTP 200` in the
-server's own log) — so this is an external dependency's reliability, not a
-design defect. `web_search`'s own resilience is a candidate for a future
-stage, not something stage 9a's own deliverables touch.
-
-**Known limitations, stated with every number above:** single run, no
-confidence interval; the judge is not validated against human labels;
-`retrieval_context` is `knowledge_search`-only (D7.14, unchanged), so
-Citation Presence checks a web citation only by confirming a web tool was
-called, never what it returned; `Settings.critic_prompt_version` (`c2`) is
-stricter than the brief's own Critique Quality permits, so more revision
-rounds than the brief's looser reading requires remain a live possibility.
-
-### Error analysis and fix — stages 9b/9c/9d
-
-Stage 9b read every stage-9a failing trace individually — not just the
-score — and classified all 8 failures into named categories with a count,
-a hypothesis and a cheapest plausible fix each. The largest system-defect
-category, "correct retrieval, wrong generation" (2 of 8 — the Researcher
-elaborating past what its own retrieved context supports), became stage
-9c's one fix: a new Researcher prompt version (`r2`, now the default) that
-says plainly when source material does not support a claim, instead of
-inventing an answer.
-
-```
-Re-measured, same 15-case dataset, same three metrics, same evals/runner.py:
-
-edge-narrow-memory-question   Correctness  0.0 (r1) -> 0.0 (r2)   unchanged
-edge-mixed-corpus-and-web     Correctness  0.4 (r1) -> 0.3 (r2)   worse
-
-Overall: 6/14 (r1, stage 9a) -> 5/14 (r2, this run)
-```
-
-**The fix did not demonstrate the improvement it targeted.** Per the
-stage's own honesty rule, written into its spec before the run: this
-result supports "the fix did not work on the two cases it targeted," not
-"the fix made the system worse" — most of the aggregate pass-rate move is
-judged to be ordinary run-to-run sampling variance at n=1, not a
-demonstrated regression. The author's decision, given a genuinely
-inconclusive result either way: keep `r2` as the default anyway, since the
-instruction is reasonable on its own terms and reverting on unproven noise
-would itself be an unjustified reaction. `r1` stays registered for
-comparison. Full case-by-case detail: `docs/error-taxonomy.md`.
-
-Two real infrastructure defects surfaced during stage 9c's own
-re-measurement, neither related to the prompt change, both fixed within
-the stage: a genuine, previously-unhit race condition in the retrieval
-reranker (two concurrent tool calls scoring the same shared cross-encoder
-model crashed the process with a native Windows access violation — fixed
-by extending an existing lock to also cover the scoring call, not just
-construction), and a Windows-console emoji-encoding crash in the eval
-tooling itself (fixed by setting `PYTHONIOENCODING=utf-8` for the
-invocation — no project code changed).
-
-A new, unresolved finding surfaced by this stage's own re-run: two cases
-produced a saved "report" that was actually Supervisor/Critic
-conversational text, not a report body — suggesting the Supervisor
-prompt's own rule against ending a turn with a summary instead of calling
-`save_report` did not hold on this run. Flagged as a candidate new error
-category, not investigated further this stage.
-
-**Stage 9d diagnosed that finding from the real span dumps and fixed it.**
-`save_report` had been called and correctly refused
-(`SaveReportVerdictGuardMiddleware`, a standing REVISE with rounds still
-remaining) — but nothing deterministic pushed the Supervisor back into the
-loop afterward, so it sometimes ended its turn with prose instead. Fixed
-with a second nudge path in `SaveReportGuardMiddleware`: re-prompt toward
-`critique` while rounds remain, toward `save_report` once the cap is
-exhausted — the same cap arithmetic the verdict guard already uses.
-
-```
-Both stage-9c cases, checked directly against their own spans and files:
-
-core-agent-vs-rag-boundary   save_report: status=error, refused (9c)
-                              -> status=OK, 7174-byte report on disk (9d)
-edge-mixed-corpus-and-web    save_report: status=error, refused x2 (9c)
-                              -> status=OK, 3328-byte report on disk (9d)
-
-Overall: 6/14 (9a) -> 5/14 (9c) -> 8/14 (9d)
-```
-
-**The mechanism claim is proven** — a span plus a file, not a score.
-`edge-mixed-corpus-and-web` still fails `Correctness` in 9d, but now for
-its *original* reason (`r2`'s own unfixed fabrication), unmasked for the
-first time now that the coordination defect is gone. The aggregate move to
-8/14 is reported, not claimed as proven improvement: three of the eight
-passes are unrelated to this stage's changes, and one previously-solid
-case (`failure-nonsense-query`) regressed for an unrelated reason. Full
-per-case detail: `docs/error-taxonomy.md`.
-
-Running the brief's own literal `deepeval test run tests/` — all five
-files, one invocation, attempted for the first time this stage — completed
-without crashing but surfaced a new infrastructure defect: the offline
-span-dump tracer stopped recording partway through the session (every run
-before 06:27:27 has real spans, every one after has an empty directory,
-with no export warning, exception or double-configure error to explain
-it). The exact trigger stays unpinned rather than guessed at; the 7 live
-cases it cost were recovered in a second, separate invocation of just
-those three files — the configuration stages 7 and 8 always used.
-
-### A three-repetition reliability measurement — stage 9e
-
-Stages 7-9d each measured the system once. Stage 9e asks the question a
-single run cannot answer: does a result hold up if the same 15-case,
-26-check suite (the golden-dataset cases plus every component and
-tool-use check, run together) is measured more than once?
-
-Six phases ran: two infrastructure fixes (a masked Windows-only caching
-defect that was silently suppressing real failures; a refusal-scoring
-metric swap, since the built-in relevancy metric structurally penalises a
-correct refusal), a fabrication-cluster fix (built and registered, but
-**not** made the default configuration this measurement runs under), two
-more targeted fixes (an incoherence check that correctly flags nonsense
-input, made default; three layers of defense against the indirect prompt
-injection case), an offline diagnostic pass over tool-call argument
-correctness (found a real, previously invisible pattern of tool calls
-missing required arguments, and a response-language check gap — neither
-implemented yet), and the closing measurement itself: one checkpoint run,
-then three full repetitions.
-
-```
-Checkpoint:    19/26 (73.1%)
-Repetition 1:  18/26 (69.2%)
-Repetition 2:  17/26 (65.4%)
-Repetition 3:  19/26 (73.1%)
-
-Mean, n=3: 18.0/26 (69.2%), range 65.4-73.1%
-16 stable pass, 5 flaky, 5 stable fail, 0 errored
-```
-
-**The checkpoint's own apparent +1 over the prior 18/26 baseline does not
-survive repeated measurement** — it sits inside the three repetitions' own
-range, indistinguishable from ordinary run-to-run variance. This is the
-central, honest finding a three-repetition measurement exists to produce:
-a single run would have reported a real improvement that three runs show
-is noise.
-
-Every stable failure traces to an already-diagnosed, named cause: the
-fabrication cluster the stage-3 fix targeted (`core-2026-agent-frameworks`,
-`edge-mixed-corpus-and-web`) — a fix that exists but is not on the default
-path — plus a third case sharing the same shape (`edge-narrow-memory-question`:
-the corpus draws no explicit single-vs-multi-agent memory contrast, and the
-system states one anyway) that the targeted fix did not cover; an accepted,
-named conflict where generalising the out-of-scope refusal rule cost one
-specific case (a recipe request) its own refusal consistency, now measured
-failing all three repetitions; and the web-citation groundedness gap named
-above, present in every measurement this project has taken. Every flaky
-case is one of three shapes: both adversarial cases (a direct jailbreak
-attempt, an indirect prompt injection) are flaky rather than stable-fail —
-the injection's own defense reduces harm after the fact without yet
-preventing the injection itself, so it sometimes gets caught in time and
-sometimes does not; two more are both very-high-tool-call-count cases,
-matching the diagnostic pass's own missing-tool-argument finding; and one
-is a component-level Researcher check on that same narrow memory
-question, flaky for the identical fabrication-adjacent reason.
-
-Full narrative, both live-spend incidents (a genuine Windows console
-encoding crash, and a deliberate mid-measurement stop honoured exactly as
-the author asked), and every numbered decision: `docs/reports/stage-9e.md`.
-Full artefact: `runs/repeat-summary.md`. Diagrams:
-`docs/diagrams/diagrams.html`, `STAGE 9E · 01-03`, and exported copies in
-`report/figures/` for `report/report.html`.
-
-### How to read the numbers
-
-Some tests are expected to fail. The goal is a baseline that improvement can
-be measured against, not a green wall.
-
-Limits are stated here because they apply to every number this project
-publishes:
-
-- **Every score in stages 7-9d is a single run (n=1).** There are no
-  confidence intervals.
-- **Stage 9e's own end-to-end reliability figure (mean 18.0/26, range
-  65.4-73.1%) is three real repetitions (n=3), reported as a mean and a
-  stated range — deliberately not a confidence interval.** At three data
-  points, a computed interval would imply a distribution shape three
-  points cannot support.
-- **The judge is not validated against human labels.** A GEval score is a
-  signal for where to look, not measured truth.
-- **A difference between two runs is a change, not a proven improvement.**
-
-Thresholds start from a measured baseline and move **up** when the baseline
-supports it. A threshold is never lowered to turn a red test green, and a
-golden case is never edited to make the system pass.
 
 ## Layout
 
@@ -596,4 +391,4 @@ full write-up:
 
 ## License
 
-Coursework. No license granted.
+MIT
